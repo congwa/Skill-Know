@@ -1,0 +1,162 @@
+# ===========================================
+# Logs
+# ===========================================
+logs/
+*.log
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ===========================================
+# Editor / IDE
+# ===========================================
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+*~
+
+# ===========================================
+# Package Managers
+# ===========================================
+# Yarn
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.yarn-cache/
+
+# npm / pnpm
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+
+# ===========================================
+# OS Generated
+# ===========================================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ===========================================
+# Build Outputs
+# ===========================================
+dist/
+build/
+out/
+.next/
+*.egg-info/
+
+# ===========================================
+# Environment
+# ===========================================
+.env
+.env.*
+!.env.example
+!.env.json.example
+
+# ===========================================
+# Python
+# ===========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg
+*.egg-info/
+
+# ===========================================
+# Backend Data (运行时生成)
+# ===========================================
+backend/data/
+!backend/data/.gitkeep
+
+# ===========================================
+# Frontend Build
+# ===========================================
+frontend/.next/
+frontend/out/
+frontend/node_modules/
+
+# ===========================================
+# Testing
+# ===========================================
+coverage/
+.vitest-cache/
+vitest.config.*.timestamp-*
+playwright-report/
+test-results/
+backend/tests/test_page_parser.py
+
+# ===========================================
+# TypeScript
+# ===========================================
+*.tsbuildinfo
+
+# ===========================================
+# Temporary / Local Files
+# ===========================================
+local/
+.sessions/
+prompt.md
+prompt-*.md
+YOUR_MEMORY_FILE_PATH
+
+# ===========================================
+# AI IDE Plugins (不需要提交)
+# ===========================================
+.aider*
+.cursorrules
+.cursor/
+.claude/
+.gemini/
+.qwen/
+.trae/
+.claude-code-router/
+.codebuddy/
+.zed/
+CLAUDE.local.md
+.windsurfchatopen/
+.windsurfrules
+
+# ===========================================
+# Documentation (自动生成)
+# ===========================================
+*_SUMMARY.md
+*_EXAMPLE.md
+README_*.md
+RESPONSE_*.md
+*_IMPLEMENTATION.md
+backend/docs/
+frontend/docs/
+
+# ===========================================
+# Misc
+# ===========================================
+mcp_server/
+stats.html
+.eslintcache
+

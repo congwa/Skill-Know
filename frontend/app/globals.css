@@ -1,0 +1,170 @@
+@import "tailwindcss";
+
+/* Tailwind v4 主题配置 */
+@theme {
+  /* 字体 */
+  --font-sans: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+  
+  /* 圆角 */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 1rem;
+  
+  /* 浅色模式颜色 */
+  --color-background: #FAFAF9;
+  --color-foreground: #1C1917;
+  --color-primary: #292524;
+  --color-primary-foreground: #FAFAF9;
+  --color-secondary: #F5F5F4;
+  --color-secondary-foreground: #44403C;
+  --color-accent: #D97706;
+  --color-accent-foreground: #FFFFFF;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #1C1917;
+  --color-popover: #FFFFFF;
+  --color-popover-foreground: #1C1917;
+  --color-muted: #E7E5E4;
+  --color-muted-foreground: #78716C;
+  --color-border: #D6D3D1;
+  --color-input: #E7E5E4;
+  --color-ring: #292524;
+  --color-destructive: #DC2626;
+  --color-destructive-foreground: #FFFFFF;
+  --color-sidebar: #FFFFFF;
+  --color-sidebar-foreground: #44403C;
+  --color-sidebar-border: #E7E5E4;
+  --color-sidebar-accent: #D6D3D1;
+}
+
+/* 深色模式颜色覆盖 */
+.dark {
+  --color-background: #0C0A09;
+  --color-foreground: #FAFAF9;
+  --color-primary: #FAFAF9;
+  --color-primary-foreground: #0C0A09;
+  --color-secondary: #1C1917;
+  --color-secondary-foreground: #E7E5E4;
+  --color-accent: #F59E0B;
+  --color-accent-foreground: #0C0A09;
+  --color-card: #18181B;
+  --color-card-foreground: #FAFAF9;
+  --color-popover: #1C1917;
+  --color-popover-foreground: #FAFAF9;
+  --color-muted: #27272A;
+  --color-muted-foreground: #A1A1AA;
+  --color-border: #3F3F46;
+  --color-input: #27272A;
+  --color-ring: #FAFAF9;
+  --color-destructive: #EF4444;
+  --color-destructive-foreground: #FAFAF9;
+  --color-sidebar: #18181B;
+  --color-sidebar-foreground: #A1A1AA;
+  --color-sidebar-border: #27272A;
+  --color-sidebar-accent: #3F3F46;
+}
+
+/* 基础样式 */
+* {
+  border-color: var(--color-border);
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+  border: 2px solid var(--color-background);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted-foreground);
+}
+
+/* Code */
+pre, code {
+  font-family: var(--font-mono);
+}
+
+/* Selection */
+::selection {
+  background: var(--color-accent);
+  color: var(--color-accent-foreground);
+}
+
+/* 列表项基础样式 */
+.list-item {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+}
+
+.list-item:hover {
+  border-color: var(--color-muted-foreground);
+}
+
+/* 列表选中状态 */
+.list-item-selected {
+  background-color: var(--color-sidebar-accent) !important;
+  border: 1px solid var(--color-accent) !important;
+  position: relative;
+}
+
+.list-item-selected::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  background-color: var(--color-accent);
+  border-radius: 9999px;
+}
+
+.list-item-hover {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+}
+
+.list-item-hover:hover {
+  background-color: var(--color-muted);
+  border-color: var(--color-muted-foreground);
+}
+
+/* 侧边栏选中状态 */
+.sidebar-item-selected {
+  background-color: var(--color-sidebar-accent) !important;
+  position: relative;
+}
+
+.sidebar-item-selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 50%;
+  background-color: var(--color-accent);
+  border-radius: 9999px;
+}

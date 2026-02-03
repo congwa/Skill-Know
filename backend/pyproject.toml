@@ -1,0 +1,68 @@
+[project]
+name = "skill-know"
+version = "0.1.1"
+description = "基于skill的搜索知识库"
+requires-python = ">=3.13"
+
+dependencies = [
+  "aiofiles>=24.1.0",
+  "aiosqlite>=0.22.1",
+  "apscheduler>=3.10.0",
+  "beautifulsoup4>=4.12.0",
+  "croniter>=2.0.0",
+  "fastapi>=0.128.0",
+  "greenlet>=3.3.1",
+  "langchain>=1.2.7",
+  "langchain-openai>=1.1.7",
+  "langchain-qdrant>=1.1.0",
+  "langchain-text-splitters>=1.1.0",
+  "langgraph>=1.0.7",
+  "langgraph-supervisor>=0.0.11",
+  "langgraph-checkpoint-sqlite>=3.0.3",
+  "langgraph-checkpoint-postgres>=3.0.3",
+  "asyncpg>=0.30.0",
+  "psycopg[binary,pool]>=3.2.0",
+  "loguru>=0.7.3",
+  "minio>=7.2.0",
+  "pillow>=10.0.0",
+  "playwright>=1.40.0",
+  "pydantic>=2.12.5",
+  "pydantic-settings>=2.12.0",
+  "python-dotenv>=1.2.1",
+  "qdrant-client>=1.16.2",
+  "rich>=14.3.1",
+  "sqlalchemy>=2.0.46",
+  "structlog>=25.5.0",
+  "uvicorn[standard]>=0.40.0",
+  "websockets>=16.0",
+  "python-multipart>=0.0.22",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.14.14",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501", "W293"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "webtest: tests that需要访问真实站点/浏览器的用例",
+    "integration: 集成测试，需要真实 API 和数据库",
+    "slow: 执行时间较长的测试",
+]
+# 详细输出配置
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+log_cli_date_format = "%H:%M:%S"
+# 捕获 stdout/stderr 实时输出
+addopts = "-s --capture=no"

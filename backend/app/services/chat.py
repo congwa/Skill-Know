@@ -3,18 +3,20 @@
 实现基于 Skill-driven 的聊天功能，支持渐进式加载和流式响应。
 """
 
+import asyncio
 import time
 import uuid
 from collections.abc import AsyncGenerator
 from typing import Any
 
 from langchain_core.messages import HumanMessage, AIMessage
-
-from app.core.chat_models import V1ChatModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from langgraph_agent_kit import QueueDomainEmitter, make_event
+
+from app.core.chat_models import V1ChatModel
 from app.core.logging import get_logger
-from app.schemas.events import StreamEventType, StreamEvent, make_event
+from app.schemas.events import StreamEventType, StreamEvent
 from app.services.conversation import ConversationService
 from app.services.skill import SkillService
 from app.services.prompt import PromptService
@@ -154,43 +156,18 @@ class ChatService:
             # 获取系统提示词
             system_prompt = await self._prompt_service.get_content("system.chat") or ""
 
-            # 创建异步事件发射器
-            class AsyncEmitter:
-                def __init__(self, gen_func):
-                    self._events: list[StreamEvent] = []
-                    self._gen_func = gen_func
-                    self._seq = 0
-                    self._conversation_id = conversation_id
-                    self._message_id = assistant_message_id
-
-                def set_seq(self, seq: int):
-                    self._seq = seq
-
-                async def aemit(self, event_type: str, payload: dict | None):
-                    if event_type == "__end__":
-                        return
-                    self._seq += 1
-                    event = make_event(
-                        seq=self._seq,
-                        type=event_type,
-                        conversation_id=self._conversation_id,
-                        message_id=self._message_id,
-                        payload=payload or {},
-                    )
-                    self._events.append(event)
-
-                def drain(self) -> list[StreamEvent]:
-                    events = self._events
-                    self._events = []
-                    return events
-
-            emitter = AsyncEmitter(None)
+            # 使用 SDK 的 QueueDomainEmitter
+            loop = asyncio.get_running_loop()
+            domain_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=10000)
+            emitter = QueueDomainEmitter(queue=domain_queue, loop=loop)
 
             # 创建上下文
             context = ChatContext(
                 emitter=emitter,
                 conversation_id=conversation_id,
-                session=self._session,
+                user_id="default_user",
+                assistant_message_id=assistant_message_id,
+                db=self._session,
             )
 
             # 获取 Agent
@@ -201,10 +178,9 @@ class ChatService:
                 emitter=emitter,
             )
 
-            # 使用流响应处理器
+            # 使用 SDK 流响应处理器
             handler = StreamingResponseHandler(
                 emitter=emitter,
-                model=llm,
                 conversation_id=conversation_id,
             )
 
@@ -214,36 +190,56 @@ class ChatService:
 
             full_content = ""
 
-            # 执行 Agent 流
-            stream_item_count = 0
-            async for item in agent.astream(
-                agent_input,
-                config=agent_config,
-                context=context,
-                stream_mode="messages",
-            ):
-                stream_item_count += 1
-                msg = item[0] if isinstance(item, (tuple, list)) and item else item
-                logger.info(f"🔄 流消息 #{stream_item_count}: type={type(msg).__name__}")
-                await handler.handle_message(msg)
+            # 创建 Agent 流任务
+            async def run_agent_stream():
+                stream_item_count = 0
+                try:
+                    async for item in agent.astream(
+                        agent_input,
+                        config=agent_config,
+                        context=context,
+                        stream_mode="messages",
+                    ):
+                        stream_item_count += 1
+                        msg = item[0] if isinstance(item, (tuple, list)) and item else item
+                        logger.info(f"🔄 流消息 #{stream_item_count}: type={type(msg).__name__}")
+                        await handler.handle_message(msg)
+                    
+                    logger.info(f"✅ 流处理完成, 共 {stream_item_count} 条消息")
+                    await handler.finalize()
+                finally:
+                    # 发送结束标记
+                    await domain_queue.put({"type": "__end__", "payload": None})
 
-                # yield 累积的事件
-                drained_events = emitter.drain()
-                logger.info(f"📤 drain 事件数: {len(drained_events)}")
-                for event in drained_events:
-                    event.seq = next_seq()
-                    yield event
-            
-            logger.info(f"✅ 流处理完成, 共 {stream_item_count} 条消息")
+            # 启动 Agent 流任务
+            producer_task = asyncio.create_task(run_agent_stream())
 
-            # 完成处理
-            result = await handler.finalize()
-            full_content = result.get("content", "")
+            # 从队列消费事件并 yield
+            while True:
+                evt = await domain_queue.get()
+                evt_type = evt.get("type")
+                if evt_type == "__end__":
+                    break
 
-            # yield 最终事件
-            for event in emitter.drain():
-                event.seq = next_seq()
-                yield event
+                payload = evt.get("payload", {})
+                
+                # 收集最终内容
+                if evt_type == StreamEventType.ASSISTANT_DELTA.value:
+                    delta = payload.get("delta", "")
+                    if delta:
+                        full_content += delta
+                elif evt_type == StreamEventType.ASSISTANT_FINAL.value:
+                    full_content = payload.get("content") or full_content
+
+                yield make_event(
+                    seq=next_seq(),
+                    conversation_id=conversation_id,
+                    message_id=assistant_message_id,
+                    type=evt_type,
+                    payload=payload,
+                )
+
+            await producer_task
 
             elapsed_ms = int((time.time() - start_time) * 1000)
 

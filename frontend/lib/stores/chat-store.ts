@@ -10,12 +10,16 @@ import {
   createInitialState,
   addUserMessage,
   startAssistantTurn,
-  timelineReducer,
   clearTurn,
   endTurn,
   historyToTimeline,
-} from "@/lib/timeline";
-import { chatStream } from "@/lib/api/chat";
+  ChatClient,
+} from "@embedease/chat-sdk";
+import { timelineReducer, type BusinessTimelineItem } from "@/lib/sdk-extensions";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+const chatClient = new ChatClient({ baseUrl: API_BASE_URL });
 
 interface StreamController {
   abort: () => void;
@@ -29,7 +33,7 @@ interface ChatState {
   isStreaming: boolean;
   conversationId: string | null;
 
-  timeline: () => TimelineItem[];
+  timeline: () => (TimelineItem | BusinessTimelineItem)[];
   currentTurnId: () => string | null;
 
   sendMessage: (content: string) => Promise<void>;
@@ -40,7 +44,7 @@ interface ChatState {
     messages: Array<{ id: string; role: string; content: string }>
   ) => void;
 
-  _handleEvent: (event: ChatEvent) => void;
+  _handleEvent: (event: ChatEvent | Record<string, unknown>) => void;
   _reset: () => void;
 }
 
@@ -95,9 +99,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         aborted = true;
       };
 
-      for await (const event of chatStream({
+      for await (const event of chatClient.stream({
+        user_id: "default_user",
+        conversation_id: currentConversationId || crypto.randomUUID(),
         message: content.trim(),
-        conversation_id: currentConversationId,
       })) {
         if (aborted) break;
 
@@ -106,7 +111,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           set({ conversationId: event.conversation_id });
         }
 
-        get()._handleEvent(event as ChatEvent);
+        get()._handleEvent(event);
       }
 
       if (!aborted) {
@@ -153,9 +158,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     set({ conversationId: id });
   },
 
-  _handleEvent: (event: ChatEvent) => {
+  _handleEvent: (event: ChatEvent | Record<string, unknown>) => {
     set((state) => ({
-      timelineState: timelineReducer(state.timelineState, event),
+      timelineState: timelineReducer(state.timelineState, event as ChatEvent),
     }));
   },
 

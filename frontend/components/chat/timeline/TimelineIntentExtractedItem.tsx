@@ -1,7 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
-import type { IntentExtractedItem } from "@/lib/timeline";
+import type { IntentExtractedItem } from "@/lib/sdk-extensions";
 
 interface Props {
   item: IntentExtractedItem;

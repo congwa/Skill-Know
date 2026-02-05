@@ -5,6 +5,7 @@ description = "基于skill的搜索知识库"
 requires-python = ">=3.13"
 
 dependencies = [
+  "langgraph-agent-kit",
   "aiofiles>=24.1.0",
   "aiosqlite>=0.22.1",
   "apscheduler>=3.10.0",
@@ -43,6 +44,9 @@ dev = [
     "pytest>=8.0.0",
     "ruff>=0.14.14",
 ]
+
+[tool.uv.sources]
+langgraph-agent-kit = { path = "./packages/langgraph-agent-kit", editable = true }
 
 [tool.ruff]
 line-length = 100

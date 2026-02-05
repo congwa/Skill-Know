@@ -3,7 +3,7 @@
 import { Bot, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import type { LLMCallClusterItem } from "@/lib/timeline";
+import type { LLMCallClusterItem } from "@embedease/chat-sdk";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 

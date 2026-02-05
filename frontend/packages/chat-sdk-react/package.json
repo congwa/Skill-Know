@@ -1,0 +1,35 @@
+{
+  "name": "@embedease/chat-sdk-react",
+  "version": "0.1.16",
+  "private": true,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@embedease/chat-sdk": "file:../chat-sdk"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.0",
+    "@types/react": "^19.2.11",
+    "@types/react-dom": "^19.2.3",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  }
+}

@@ -2,7 +2,7 @@
 
 import { Wrench, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ToolCallItem } from "@/lib/timeline";
+import type { ToolCallItem } from "@embedease/chat-sdk";
 
 interface TimelineToolCallItemProps {
   item: ToolCallItem;

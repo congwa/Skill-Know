@@ -1,7 +1,7 @@
 "use client";
 
 import { User } from "lucide-react";
-import type { UserMessageItem } from "@/lib/timeline";
+import type { UserMessageItem } from "@embedease/chat-sdk";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
-import type { SkillActivatedItem } from "@/lib/timeline";
+import type { SkillActivatedItem } from "@embedease/chat-sdk";
 
 interface TimelineSkillActivatedItemProps {
   item: SkillActivatedItem;

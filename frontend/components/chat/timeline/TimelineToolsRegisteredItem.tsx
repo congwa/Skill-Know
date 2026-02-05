@@ -1,7 +1,7 @@
 "use client";
 
 import { Wrench, Sparkles } from "lucide-react";
-import type { ToolsRegisteredItem } from "@/lib/timeline";
+import type { ToolsRegisteredItem } from "@/lib/sdk-extensions";
 
 interface Props {
   item: ToolsRegisteredItem;

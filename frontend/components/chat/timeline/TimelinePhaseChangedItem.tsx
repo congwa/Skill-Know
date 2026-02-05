@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight, Brain, Database, Wrench, MessageSquare } from "lucide-react";
-import type { PhaseChangedItem } from "@/lib/timeline";
+import type { PhaseChangedItem } from "@/lib/sdk-extensions";
 
 interface Props {
   item: PhaseChangedItem;

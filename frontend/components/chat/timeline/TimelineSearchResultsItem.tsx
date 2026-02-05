@@ -1,7 +1,7 @@
 "use client";
 
 import { Database, Sparkles } from "lucide-react";
-import type { SearchResultsItem } from "@/lib/timeline";
+import type { SearchResultsItem } from "@/lib/sdk-extensions";
 
 interface Props {
   item: SearchResultsItem;

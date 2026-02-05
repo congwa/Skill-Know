@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RichEditor, type RichEditorRef } from "@/components/rich-editor";
 import { useChatStore } from "@/lib/stores";
-import type { TimelineItem } from "@/lib/timeline";
+import type { TimelineItem } from "@embedease/chat-sdk";
+import type { BusinessTimelineItem } from "@/lib/sdk-extensions";
 import {
   LLMCallCluster,
   TimelineUserMessageItem,
@@ -60,8 +61,9 @@ export default function ChatPage() {
     }
   };
 
-  const renderTimelineItem = (item: TimelineItem) => {
-    switch (item.type) {
+  const renderTimelineItem = (item: TimelineItem | BusinessTimelineItem) => {
+    const itemType = item.type;
+    switch (itemType) {
       case "user.message":
         return (
           <div key={item.id} className="mx-auto max-w-3xl px-6">

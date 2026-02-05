@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle } from "lucide-react";
-import type { ErrorItem } from "@/lib/timeline";
+import type { ErrorItem } from "@embedease/chat-sdk";
 
 interface TimelineErrorItemProps {
   item: ErrorItem;

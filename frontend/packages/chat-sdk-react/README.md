@@ -72,6 +72,84 @@ function ChatComponent() {
 
 ---
 
+## Zustand Store Factory（v0.2.0 新增）
+
+`createChatStoreSlice` 提供开箱即用的聊天状态管理，消除各项目重复的 store 代码。
+
+### 最简用法
+
+```typescript
+import { create } from 'zustand';
+import { createChatStoreSlice } from '@embedease/chat-sdk-react';
+
+export const useChatStore = create(
+  createChatStoreSlice({ baseUrl: '/api' })
+);
+```
+
+Store 内置功能：
+- `sendMessage(message)` — 发送消息并自动流式处理
+- `abortStream()` — 中止当前流
+- `clearMessages()` — 清空消息
+- `setConversationId(id)` — 设置会话 ID
+- `initFromHistory(messages)` — 从历史消息初始化
+- `setTimelineState(state)` — 直接设置 timeline 状态
+
+### 自定义事件 + 中间件
+
+```typescript
+import { create } from 'zustand';
+import {
+  createChatStoreSlice,
+  composeReducers,
+  insertItem,
+  type CustomReducer,
+  type TimelineItemBase,
+  type TimelineItem,
+} from '@embedease/chat-sdk-react';
+
+type MyItem = TimelineItem | { type: 'custom'; id: string; turnId: string; ts: number; data: unknown };
+
+const myReducer: CustomReducer<MyItem> = (state, event) => {
+  const evt = event as Record<string, unknown>;
+  if (evt.type === 'custom') {
+    return insertItem(state, { type: 'custom', id: String(Date.now()), turnId: '', ts: Date.now(), data: evt.payload } as MyItem);
+  }
+  return null; // 未处理，交给 SDK 内置 reducer
+};
+
+export const useChatStore = create(
+  createChatStoreSlice<MyItem>({
+    baseUrl: '/api',
+    reducer: composeReducers<MyItem>(myReducer),
+    onEvent: (event, api) => {
+      // 事件中间件：返回 event 继续处理，返回 null 跳过
+      return event;
+    },
+    onStreamEnd: async ({ conversationId, fullContent }) => {
+      // 流结束回调（如落库）
+    },
+  })
+);
+```
+
+### CreateChatStoreOptions
+
+```typescript
+interface CreateChatStoreOptions<T extends TimelineItemBase = TimelineItem> {
+  baseUrl: string | (() => string);        // API 基础 URL
+  headers?: Record<string, string> | (() => Record<string, string>); // 自定义请求头
+  reducer?: (state, event) => TimelineState<T>;  // 自定义 reducer
+  onEvent?: (event, api) => ChatEvent | null;     // 事件中间件
+  onStreamEnd?: (result, api) => void | Promise<void>; // 流结束回调
+  onError?: (error, api) => void;                 // 错误回调
+  buildRequest?: (params) => ChatRequest;         // 自定义请求构建
+  userId?: string;                                // 初始 user_id
+}
+```
+
+---
+
 ## Hooks
 
 ### useChat
@@ -478,14 +556,30 @@ NEXT_PUBLIC_USE_NEW_CHAT_SDK=true
 
 ```typescript
 import {
+  // 核心类型
   type TimelineState,
   type TimelineItem,
+  type TimelineItemBase,  // v0.2.0 新增
   type ChatEvent,
   type ChatRequest,
   type ImageAttachment,
   type HistoryMessage,
   type ConnectionState,
   type WSMessage,
+
+  // Reducer 组合 (v0.2.0 新增)
+  composeReducers,
+  type CustomReducer,
+  insertItem,
+  updateItemById,
+  removeWaitingItem,
+
+  // Store Factory (v0.2.0 新增)
+  createChatStoreSlice,
+  type CreateChatStoreOptions,
+  type ChatStoreState,
+  type ChatStoreApi,
+  type StreamEndResult,
 } from '@embedease/chat-sdk-react';
 ```
 

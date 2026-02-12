@@ -1,10 +1,12 @@
-"""聊天服务
+"""聊天服务 - SDK v0.2.0 版本
 
-实现基于 Skill-driven 的聊天功能，支持渐进式加载和流式响应。
+使用 Orchestrator + AgentRunner + ContentAggregator 重构。
+队列管理、内容聚合、错误处理均由 SDK 自动完成，
+业务只需实现 AgentRunner 和 on_stream_end 钩子。
 """
 
-import asyncio
-import time
+from __future__ import annotations
+
 import uuid
 from collections.abc import AsyncGenerator
 from typing import Any
@@ -12,20 +14,55 @@ from typing import Any
 from langchain_core.messages import HumanMessage, AIMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from langgraph_agent_kit import QueueDomainEmitter, make_event
+from langgraph_agent_kit import (
+    StreamEvent,
+    Orchestrator,
+    OrchestratorHooks,
+    StreamEndInfo,
+)
+from langgraph_agent_kit.core.context import ChatContext
 
 from app.core.chat_models import V1ChatModel
 from app.core.logging import get_logger
-from app.schemas.events import StreamEventType, StreamEvent
+from app.schemas.events import StreamEventType
 from app.services.conversation import ConversationService
 from app.services.skill import SkillService
 from app.services.prompt import PromptService
 from app.services.system_config import SystemConfigService
 from app.services.agent.core import agent_service
-from app.services.agent.streams import StreamingResponseHandler
-from app.services.streaming.context import ChatContext
 
 logger = get_logger("chat_service")
+
+
+# ==================== AgentRunner 实现 ====================
+
+
+class SkillKnowAgentRunner:
+    """AgentRunner 实现：委托给 agent_service.chat_stream()"""
+
+    def __init__(
+        self,
+        *,
+        model: Any,
+        system_prompt: str,
+        session: Any = None,
+    ) -> None:
+        self._model = model
+        self._system_prompt = system_prompt
+        self._session = session
+
+    async def run(self, message: str, context: ChatContext, **kwargs: Any) -> None:
+        await agent_service.chat_stream(
+            message=message,
+            conversation_id=context.conversation_id,
+            model=self._model,
+            system_prompt=self._system_prompt,
+            context=context,
+            session=self._session,
+        )
+
+
+# ==================== ChatService ====================
 
 
 class ChatService:
@@ -99,18 +136,14 @@ class ChatService:
         message: str,
         conversation_id: str | None = None,
     ) -> AsyncGenerator[StreamEvent, None]:
-        """流式聊天 - 使用 LangGraph Agent
-        
-        使用 create_agent + agent.astream 处理消息流，
-        工具调用由 LangGraph 内部处理。
+        """流式聊天 - 使用 SDK v0.2.0 Orchestrator
+
+        Orchestrator 自动管理：
+        - 事件队列（QueueDomainEmitter + asyncio.Queue）
+        - 内容聚合（ContentAggregator: full_content, reasoning）
+        - meta.start / error 事件自动发送
+        - on_stream_end 钩子落库
         """
-        seq = 0
-
-        def next_seq() -> int:
-            nonlocal seq
-            seq += 1
-            return seq
-
         # 创建或获取会话
         if conversation_id:
             conversation = await self._conversation_service.get_conversation(
@@ -134,133 +167,56 @@ class ChatService:
             message_id=user_message_id,
         )
 
-        # 发送开始事件
-        yield make_event(
-            seq=next_seq(),
-            type=StreamEventType.META_START.value,
-            conversation_id=conversation_id,
-            message_id=assistant_message_id,
-            payload={
-                "user_message_id": user_message_id,
-                "assistant_message_id": assistant_message_id,
-                "mode": "agent",
-            },
+        # 获取 LLM 和系统提示词
+        llm = await self._get_llm()
+        system_prompt = await self._prompt_service.get_content("system.chat") or ""
+
+        # 构建 AgentRunner
+        runner = SkillKnowAgentRunner(
+            model=llm,
+            system_prompt=system_prompt,
+            session=self._session,
         )
 
-        try:
-            start_time = time.time()
+        # 落库 & 日志钩子
+        conversation_service = self._conversation_service
 
-            # 获取 LLM
-            llm = await self._get_llm()
-
-            # 获取系统提示词
-            system_prompt = await self._prompt_service.get_content("system.chat") or ""
-
-            # 使用 SDK 的 QueueDomainEmitter
-            loop = asyncio.get_running_loop()
-            domain_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=10000)
-            emitter = QueueDomainEmitter(queue=domain_queue, loop=loop)
-
-            # 创建上下文
-            context = ChatContext(
-                emitter=emitter,
-                conversation_id=conversation_id,
-                user_id="default_user",
-                assistant_message_id=assistant_message_id,
-                db=self._session,
-            )
-
-            # 获取 Agent
-            agent = await agent_service.get_agent(
-                model=llm,
-                system_prompt=system_prompt,
-                session=self._session,
-                emitter=emitter,
-            )
-
-            # 使用 SDK 流响应处理器
-            handler = StreamingResponseHandler(
-                emitter=emitter,
-                conversation_id=conversation_id,
-            )
-
-            # 准备 Agent 输入
-            agent_input = {"messages": [HumanMessage(content=message)]}
-            agent_config: dict[str, Any] = {"configurable": {"thread_id": conversation_id}}
-
-            full_content = ""
-
-            # 创建 Agent 流任务
-            async def run_agent_stream():
-                stream_item_count = 0
-                try:
-                    async for item in agent.astream(
-                        agent_input,
-                        config=agent_config,
-                        context=context,
-                        stream_mode="messages",
-                    ):
-                        stream_item_count += 1
-                        msg = item[0] if isinstance(item, (tuple, list)) and item else item
-                        logger.info(f"🔄 流消息 #{stream_item_count}: type={type(msg).__name__}")
-                        await handler.handle_message(msg)
-                    
-                    logger.info(f"✅ 流处理完成, 共 {stream_item_count} 条消息")
-                    await handler.finalize()
-                finally:
-                    # 发送结束标记
-                    await domain_queue.put({"type": "__end__", "payload": None})
-
-            # 启动 Agent 流任务
-            producer_task = asyncio.create_task(run_agent_stream())
-
-            # 从队列消费事件并 yield
-            while True:
-                evt = await domain_queue.get()
-                evt_type = evt.get("type")
-                if evt_type == "__end__":
-                    break
-
-                payload = evt.get("payload", {})
-                
-                # 收集最终内容
-                if evt_type == StreamEventType.ASSISTANT_DELTA.value:
-                    delta = payload.get("delta", "")
-                    if delta:
-                        full_content += delta
-                elif evt_type == StreamEventType.ASSISTANT_FINAL.value:
-                    full_content = payload.get("content") or full_content
-
-                yield make_event(
-                    seq=next_seq(),
-                    conversation_id=conversation_id,
-                    message_id=assistant_message_id,
-                    type=evt_type,
-                    payload=payload,
-                )
-
-            await producer_task
-
-            elapsed_ms = int((time.time() - start_time) * 1000)
-
-            # 保存助手消息
-            await self._conversation_service.add_message(
-                conversation_id=conversation_id,
+        async def on_stream_end(info: StreamEndInfo) -> None:
+            agg = info.aggregator
+            latency_ms = info.context.response_latency_ms
+            await conversation_service.add_message(
+                conversation_id=info.conversation_id,
                 role="assistant",
-                content=full_content,
-                message_id=assistant_message_id,
-                latency_ms=elapsed_ms,
+                content=agg.full_content,
+                message_id=info.assistant_message_id,
+                latency_ms=latency_ms,
+            )
+            logger.debug(
+                "已保存 assistant message (SDK v0.2)",
+                message_id=info.assistant_message_id,
+                content_length=len(agg.full_content),
             )
 
-        except Exception as e:
-            logger.exception("Agent 聊天失败", conversation_id=conversation_id, error=str(e))
-            yield make_event(
-                seq=next_seq(),
-                type=StreamEventType.ERROR.value,
-                conversation_id=conversation_id,
-                message_id=assistant_message_id,
-                payload={"message": str(e)},
-            )
+        async def on_error(e: Exception, conv_id: str) -> None:
+            logger.exception("Agent 聊天失败 (SDK v0.2)", conversation_id=conv_id, error=str(e))
+
+        orchestrator = Orchestrator(
+            agent_runner=runner,
+            hooks=OrchestratorHooks(
+                on_stream_end=on_stream_end,
+                on_error=on_error,
+            ),
+        )
+
+        async for event in orchestrator.run(
+            message=message,
+            conversation_id=conversation_id,
+            user_id="default_user",
+            assistant_message_id=assistant_message_id,
+            user_message_id=user_message_id,
+            db=self._session,
+        ):
+            yield event
 
     async def chat(self, message: str, conversation_id: str | None = None) -> dict:
         """非流式聊天"""

@@ -649,7 +649,7 @@ wheels = [
 
 [[package]]
 name = "langgraph-agent-kit"
-version = "0.1.16"
+version = "0.2.0"
 source = { editable = "packages/langgraph-agent-kit" }
 dependencies = [
     { name = "langchain-core" },

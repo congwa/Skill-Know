@@ -9,6 +9,7 @@
 - [核心概念](#核心概念)
 - [API 参考](#api-参考)
   - [ChatStreamKit](#chatstreamkit)
+  - [Orchestrator（v0.2.0 新增）](#orchestratorv020-新增)
   - [事件系统](#事件系统)
   - [Payload TypedDict](#payload-typeddict)
   - [上下文管理](#上下文管理)
@@ -65,6 +66,45 @@ kit = ChatStreamKit(model=model, middlewares=[Middlewares.sse_events()])
 async def chat(request: Request):
     data = await request.json()
     return kit.create_sse_response(
+        message=data["message"],
+        conversation_id=data["conversation_id"],
+        user_id=data["user_id"],
+    )
+```
+
+### 使用 Orchestrator（v0.2.0 新增，推荐）
+
+钩子化的编排器，消除重复的 queue 消费 + 落库逻辑：
+
+```python
+from langgraph_agent_kit import Orchestrator, OrchestratorHooks, StreamEndInfo
+
+# 1. 实现 AgentRunner
+class MyAgentRunner:
+    async def run(self, message, context, **kwargs):
+        agent = build_my_agent(context.emitter)
+        async for chunk in agent.astream({"messages": [{"role": "user", "content": message}]}):
+            await handler.handle(chunk)
+        await context.emitter.aemit("__end__", None)
+
+# 2. 定义钩子
+async def save_to_db(info: StreamEndInfo):
+    await db.save_message(
+        conversation_id=info.conversation_id,
+        content=info.aggregator.full_content,
+        tool_calls=info.aggregator.tool_calls_list,
+    )
+
+# 3. 创建 + 使用
+orchestrator = Orchestrator(
+    agent_runner=MyAgentRunner(),
+    hooks=OrchestratorHooks(on_stream_end=save_to_db),
+)
+
+@app.post("/chat")
+async def chat(request: Request):
+    data = await request.json()
+    return orchestrator.create_sse_response(
         message=data["message"],
         conversation_id=data["conversation_id"],
         user_id=data["user_id"],
@@ -133,6 +173,8 @@ meta.start → llm.call.start → [assistant.delta...] → llm.call.end
 ## API 参考
 
 ### ChatStreamKit
+
+> 适合简单场景。复杂场景推荐使用 [Orchestrator](#orchestratorv020-新增)。
 
 主入口类，提供流畅的 API 配置和运行流式聊天。
 
@@ -220,6 +262,146 @@ kit.add_tool(ToolSpec(
     func=search_function,
 ))
 ```
+
+---
+
+### Orchestrator（v0.2.0 新增）
+
+可组合的聊天流编排器，通过钩子系统消除各项目重复的编排代码。
+
+#### 核心组件
+
+| 组件 | 说明 |
+|------|------|
+| `Orchestrator` | 编排器主类，管理队列、事件、钩子 |
+| `AgentRunner` | Agent 运行器协议（用户实现） |
+| `OrchestratorHooks` | 钩子配置 |
+| `ContentAggregator` | 内容聚合器（自动追踪 full_content/reasoning/tool_calls） |
+| `StreamStartInfo` | 流开始钩子参数 |
+| `StreamEndInfo` | 流结束钩子参数 |
+
+#### 构造函数
+
+```python
+Orchestrator(
+    *,
+    agent_runner: AgentRunner,          # Agent 运行器实例
+    hooks: OrchestratorHooks = None,    # 钩子配置
+    event_queue_size: int = 10000,      # 事件队列大小
+)
+```
+
+#### run()
+
+运行编排流程，返回 `StreamEvent` 异步生成器。
+
+```python
+async def run(
+    self,
+    *,
+    message: str,                      # 用户消息
+    conversation_id: str,              # 会话 ID
+    user_id: str,                      # 用户 ID
+    assistant_message_id: str = None,  # 助手消息 ID（自动生成）
+    user_message_id: str = None,       # 用户消息 ID（自动生成）
+    db: Any = None,                    # 数据库会话
+    **runner_kwargs,                   # 传递给 agent_runner.run()
+) -> AsyncGenerator[StreamEvent, None]
+```
+
+#### AgentRunner 协议
+
+用户需实现的唯一接口：
+
+```python
+class AgentRunner(Protocol):
+    async def run(
+        self,
+        message: str,
+        context: ChatContext,
+        **kwargs,
+    ) -> None:
+        """通过 context.emitter 发送事件。
+        结束时必须调用 await context.emitter.aemit("__end__", None)
+        """
+        ...
+```
+
+#### OrchestratorHooks
+
+```python
+@dataclass
+class OrchestratorHooks:
+    on_stream_start: Callable[[StreamStartInfo], Awaitable[None]] = None
+    on_event: Callable[[str, dict, ContentAggregator], Awaitable[None]] = None
+    on_stream_end: Callable[[StreamEndInfo], Awaitable[None]] = None
+    on_error: Callable[[Exception, str], Awaitable[None]] = None
+```
+
+#### ContentAggregator
+
+在 Orchestrator 内部自动维护，可在钩子中读取：
+
+```python
+@dataclass
+class ContentAggregator:
+    full_content: str        # 累积的助手回复
+    reasoning: str           # 累积的推理过程
+    products: Any            # 商品数据
+    tool_calls: dict         # 工具调用追踪 {tool_call_id: {...}}
+
+    @property
+    def tool_calls_list(self) -> list[dict]:  # 列表形式
+```
+
+#### 完整示例
+
+```python
+from langgraph_agent_kit import (
+    Orchestrator, OrchestratorHooks,
+    StreamStartInfo, StreamEndInfo, ContentAggregator,
+    create_sse_response,
+)
+
+class MyAgentRunner:
+    def __init__(self, agent):
+        self.agent = agent
+
+    async def run(self, message, context, **kwargs):
+        handler = StreamingResponseHandler(emitter=context.emitter, model=self.agent)
+        async for chunk in self.agent.astream(
+            {"messages": [{"role": "user", "content": message}]},
+            config={"configurable": {"thread_id": context.conversation_id}},
+        ):
+            await handler.handle_message(chunk)
+        await handler.finalize()
+        await context.emitter.aemit("__end__", None)
+
+async def on_start(info: StreamStartInfo):
+    await save_user_message(info.conversation_id, info.message)
+
+async def on_end(info: StreamEndInfo):
+    await save_assistant_message(
+        conversation_id=info.conversation_id,
+        content=info.aggregator.full_content,
+        reasoning=info.aggregator.reasoning,
+        tool_calls=info.aggregator.tool_calls_list,
+    )
+
+orchestrator = Orchestrator(
+    agent_runner=MyAgentRunner(my_agent),
+    hooks=OrchestratorHooks(
+        on_stream_start=on_start,
+        on_stream_end=on_end,
+    ),
+)
+```
+
+**Orchestrator 自动提供：**
+- 事件队列管理（`QueueDomainEmitter` + `asyncio.Queue`）
+- `ContentAggregator` 自动追踪
+- `meta.start` / `error` 事件自动发送
+- 钩子系统
 
 ---
 

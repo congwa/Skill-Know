@@ -12,11 +12,6 @@ export {
   insertItem,
   updateItemById,
   removeWaitingItem,
-  getCurrentLlmCluster,
-  appendSubItemToCurrentCluster,
-  updateSubItemInCurrentCluster,
-  appendSubItemToCurrentToolCall,
-  getLastSubItemOfType,
 } from "./helpers";
 
 // Action 函数导出
@@ -30,6 +25,9 @@ export {
 
 // Reducer 导出
 export { timelineReducer } from "./reducer";
+
+// Reducer 组合器导出
+export { composeReducers, type CustomReducer } from "./compose-reducer";
 
 // 历史转换函数导出
 export { historyToTimeline } from "./history";

@@ -227,6 +227,67 @@ import { timelineReducer } from '@embedease/chat-sdk';
 state = timelineReducer(state, event);
 ```
 
+#### Reducer 组合器（v0.2.0 新增）
+
+通过 `composeReducers` 支持自定义事件类型，未被任何自定义 reducer 处理的事件会自动交给 SDK 内置 reducer：
+
+```typescript
+import {
+  composeReducers,
+  insertItem,
+  type CustomReducer,
+  type TimelineItemBase,
+  type TimelineItem,
+} from '@embedease/chat-sdk';
+
+// 定义扩展的 Item 类型
+interface IntentItem extends TimelineItemBase {
+  type: 'intent.extracted';
+  intent: string;
+}
+
+type MyItem = TimelineItem | IntentItem;
+
+// 自定义 reducer：返回 null 表示未处理，交给下一个
+const myReducer: CustomReducer<MyItem> = (state, event) => {
+  const evt = event as Record<string, unknown>;
+  if (evt.type === 'intent.extracted') {
+    return insertItem(state, {
+      type: 'intent.extracted',
+      id: String(Date.now()),
+      turnId: '',
+      ts: Date.now(),
+      intent: evt.payload as string,
+    } as MyItem);
+  }
+  return null;
+};
+
+// 组合：自定义 reducer 优先，未处理的交给 SDK 内置
+const composedReducer = composeReducers<MyItem>(myReducer);
+```
+
+#### 辅助函数（v0.2.0 新增导出）
+
+以下辅助函数现已公开导出，供自定义 reducer 使用：
+
+```typescript
+import {
+  insertItem,
+  updateItemById,
+  removeWaitingItem,
+} from '@embedease/chat-sdk';
+
+// 插入新 item
+state = insertItem(state, newItem);
+
+// 按 ID 更新 item
+state = updateItemById(state, 'item-id', (item) => ({ ...item, data: 'new' }));
+
+// 移除等待项
+state = removeWaitingItem(state, turnId);
+```
+
 ---
 
 ### WebSocket 模块
@@ -347,11 +408,25 @@ type TimelineItem =
   | MemoryEventItem;     // 记忆事件
 ```
 
+#### TimelineItemBase（v0.2.0 新增）
+
+所有 TimelineItem 的基础接口，用于泛型扩展：
+
+```typescript
+interface TimelineItemBase {
+  type: string;
+  id: string;
+  turnId: string;
+  ts: number;
+}
+```
+
 #### TimelineState
 
 ```typescript
-interface TimelineState {
-  timeline: TimelineItem[];
+// v0.2.0: 支持泛型，默认 T = TimelineItem（向后兼容）
+interface TimelineState<T extends TimelineItemBase = TimelineItem> {
+  timeline: T[];
   indexById: Record<string, number>;
   activeTurn: {
     turnId: string | null;

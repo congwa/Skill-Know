@@ -6,11 +6,13 @@
  */
 
 import {
-  timelineReducer as sdkReducer,
+  composeReducers as sdkComposeReducers,
   insertItem,
   removeWaitingItem,
   type TimelineState,
+  type TimelineItemBase,
   type ChatEvent,
+  type CustomReducer,
 } from "@embedease/chat-sdk";
 import type {
   IntentExtractedItem,
@@ -19,30 +21,20 @@ import type {
   PhaseChangedItem,
 } from "./types";
 
-/** 业务事件基础结构 */
-interface BusinessEvent {
-  type: string;
-  seq: number;
-  payload: Record<string, unknown>;
-}
-
-/** 扩展的事件类型（包含业务事件） */
-type ExtendedEvent = ChatEvent | BusinessEvent;
-
 /**
  * 业务扩展 Reducer
  *
- * 处理 Skill-Know 特有的事件类型，其他事件交给 SDK 处理
+ * 符合 SDK CustomReducer 协议：
+ * - 处理 Skill-Know 特有的事件类型，返回 TimelineState
+ * - 未识别的事件返回 null，交给 SDK 内置 reducer 兜底
  */
-export function businessReducer(
-  state: TimelineState,
-  event: ExtendedEvent
-): TimelineState {
+export const businessReducer: CustomReducer<TimelineItemBase> = (state, event) => {
   const turnId = state.activeTurn.turnId;
   const now = Date.now();
-  const eventType = event.type;
-  const eventSeq = event.seq;
-  const eventPayload = event.payload as Record<string, unknown>;
+  const evt = event as Record<string, unknown>;
+  const eventType = evt.type as string;
+  const eventSeq = evt.seq as number;
+  const eventPayload = evt.payload as Record<string, unknown>;
 
   switch (eventType) {
     case "intent.extracted": {
@@ -104,10 +96,24 @@ export function businessReducer(
     }
 
     default:
-      // 其他事件交给 SDK 处理
-      return sdkReducer(state, event as ChatEvent);
+      // 未识别的事件，交给 SDK 内置 reducer 兜底
+      return null;
   }
-}
+};
 
-// 为了兼容性，也导出为 timelineReducer
-export { businessReducer as timelineReducer };
+// 使用 SDK composeReducers 组合：businessReducer → SDK 内置 timelineReducer
+const _composedReducer = sdkComposeReducers<TimelineItemBase>(businessReducer);
+
+/**
+ * 组合后的 Timeline reducer
+ *
+ * 内部使用 SDK composeReducers，对外保持 TimelineState 类型兼容
+ */
+export function timelineReducer(
+  state: TimelineState,
+  event: ChatEvent | Record<string, unknown>
+): TimelineState {
+  // ChatEvent 联合类型需要先转为 Record 以满足 composeReducers 签名
+  const evt = event as Record<string, unknown>;
+  return _composedReducer(state, evt) as TimelineState;
+}

@@ -3,9 +3,10 @@
 在应用启动时初始化系统级技能。
 """
 
+from app.core.context import build_skill_uri
 from app.core.database import get_db_context
 from app.core.logging import get_logger
-from app.models.skill import Skill, SkillType, SkillCategory
+from app.models.skill import Skill, SkillCategory, SkillType
 
 logger = get_logger("skill_initializer")
 
@@ -126,8 +127,12 @@ async def init_system_skills():
             result = await session.execute(stmt)
             existing = result.scalar_one_or_none()
 
+            uri = build_skill_uri(skill_data["name"])
+            abstract = skill_data["description"][:200]
+
             if existing:
-                # 更新内容（系统技能可以被代码更新）
+                existing.uri = uri
+                existing.abstract = abstract
                 existing.description = skill_data["description"]
                 existing.content = skill_data["content"]
                 existing.trigger_keywords = skill_data["trigger_keywords"]
@@ -135,10 +140,11 @@ async def init_system_skills():
                 existing.priority = skill_data["priority"]
                 logger.debug("更新系统技能", name=skill_data["name"])
             else:
-                # 创建新技能
                 skill = Skill(
                     name=skill_data["name"],
                     description=skill_data["description"],
+                    uri=uri,
+                    abstract=abstract,
                     type=SkillType.SYSTEM,
                     category=skill_data["category"],
                     content=skill_data["content"],

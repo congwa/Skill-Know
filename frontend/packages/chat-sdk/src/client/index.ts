@@ -6,6 +6,7 @@
 export {
   streamChat,
   ChatClient,
+  type ChatClientConfig,
   type StreamChatController,
   type StreamChatOptions,
   type StreamWithTimelineResult,

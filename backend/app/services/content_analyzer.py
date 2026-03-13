@@ -5,7 +5,6 @@
 
 import re
 from dataclasses import dataclass, field
-from typing import Any
 
 from app.core.logging import get_logger
 from app.services.document_parser import ParsedDocument

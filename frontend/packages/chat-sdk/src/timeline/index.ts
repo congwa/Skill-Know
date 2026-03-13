@@ -8,6 +8,7 @@ export * from "./types";
 // 辅助函数导出
 export {
   getToolLabel,
+  registerToolLabels,
   createInitialState,
   insertItem,
   updateItemById,

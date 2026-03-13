@@ -9,12 +9,10 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from langgraph_agent_kit import StreamEventType
 from langgraph_agent_kit.core.context import ChatContext
 
@@ -114,6 +112,7 @@ async def _run_chat_stream(
 ) -> tuple[list[dict], FakeConversationService]:
     """辅助：通过 Orchestrator 运行聊天流并收集事件（带超时）"""
     from langgraph_agent_kit import Orchestrator, OrchestratorHooks, StreamEndInfo
+
     from app.services.chat import SkillKnowAgentRunner
 
     conv_service = FakeConversationService()

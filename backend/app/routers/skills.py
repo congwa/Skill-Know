@@ -4,13 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.models.skill import SkillType, SkillCategory
+from app.models.skill import SkillCategory, SkillType
 from app.schemas.skill import (
     SkillCreate,
-    SkillUpdate,
-    SkillResponse,
     SkillListResponse,
+    SkillResponse,
     SkillSearchRequest,
+    SkillUpdate,
 )
 from app.services.skill import SkillService
 

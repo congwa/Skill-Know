@@ -59,15 +59,8 @@ export interface UseWebSocketReturn {
   disconnect: () => void;
 }
 
-function getWebSocketBaseUrl(): string {
+function inferWebSocketBaseUrl(): string {
   if (typeof window === "undefined") return "";
-
-  const envUrl = process.env.NEXT_PUBLIC_WS_URL;
-  if (envUrl) return envUrl;
-
-  if (process.env.NODE_ENV === "development") {
-    return "ws://127.0.0.1:8000";
-  }
 
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${window.location.host}`;
@@ -131,7 +124,8 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       return;
     }
 
-    const wsUrl = baseUrl || getWebSocketBaseUrl();
+    const wsUrl = baseUrl || inferWebSocketBaseUrl();
+    if (!wsUrl) return;
     const manager =
       role === "agent"
         ? createAgentWebSocketManager(wsUrl, conversationId, userId)

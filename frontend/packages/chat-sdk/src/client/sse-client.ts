@@ -22,8 +22,14 @@ export interface StreamChatOptions {
   controller?: StreamChatController;
   /** 自定义请求头 */
   headers?: Record<string, string>;
-  /** 请求超时（毫秒） */
-  timeout?: number;
+  /** 自定义聊天 API 路径（默认 "/api/v1/chat"） */
+  chatEndpoint?: string;
+}
+
+export interface ChatClientConfig {
+  baseUrl: string;
+  headers?: Record<string, string>;
+  chatEndpoint?: string;
 }
 
 /**
@@ -47,7 +53,8 @@ export async function* streamChat(
     };
   }
 
-  const response = await fetch(`${baseUrl}/api/v1/chat`, {
+  const endpoint = options?.chatEndpoint ?? "/api/v1/chat";
+  const response = await fetch(`${baseUrl}${endpoint}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -64,7 +71,7 @@ export async function* streamChat(
 
   const reader = response.body?.getReader();
   if (!reader) {
-    throw new Error("无法读取响应流");
+    throw new Error("Unable to read response stream");
   }
 
   const decoder = new TextDecoder();
@@ -125,11 +132,13 @@ export interface StreamWithTimelineResult {
 export class ChatClient {
   private baseUrl: string;
   private headers: Record<string, string>;
+  private chatEndpoint?: string;
   private controller: StreamChatController = { abort: () => {} };
 
-  constructor(config: { baseUrl: string; headers?: Record<string, string> }) {
+  constructor(config: ChatClientConfig) {
     this.baseUrl = config.baseUrl;
     this.headers = config.headers || {};
+    this.chatEndpoint = config.chatEndpoint;
   }
 
   /**
@@ -142,6 +151,7 @@ export class ChatClient {
     yield* streamChat(this.baseUrl, request, {
       controller: this.controller,
       headers: this.headers,
+      chatEndpoint: this.chatEndpoint,
     });
   }
 

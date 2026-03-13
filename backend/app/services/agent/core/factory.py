@@ -11,7 +11,6 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 
 from app.core.logging import get_logger
-from app.services.agent.tools import get_tools
 from app.services.agent.middleware.registry import build_middlewares
 from app.services.streaming.context import ChatContext
 
@@ -59,7 +58,7 @@ async def build_agent(
         middleware_types = [type(m).__name__ for m in middlewares] if middlewares else []
         model_name = getattr(model, "model_name", None) or getattr(model, "model", None)
         
-        logger.info(f"📋 create_agent 参数:")
+        logger.info("📋 create_agent 参数:")
         logger.info(f"   - model: {type(model).__name__} ({model_name})")
         logger.info(f"   - tools ({len(tools)}): {tool_names}")
         logger.info(f"   - middlewares ({len(middlewares) if middlewares else 0}): {middleware_types}")

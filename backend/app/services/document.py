@@ -1,19 +1,17 @@
 """文档服务"""
 
 import hashlib
-from pathlib import Path
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.logging import get_logger
 from app.models.document import Document, DocumentFolder, DocumentStatus
 from app.schemas.document import (
     DocumentCreate,
-    DocumentUpdate,
     DocumentFolderCreate,
     DocumentFolderUpdate,
+    DocumentUpdate,
 )
 
 logger = get_logger("document_service")

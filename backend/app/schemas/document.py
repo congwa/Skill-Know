@@ -62,20 +62,22 @@ class DocumentResponse(BaseModel):
     """文档响应"""
 
     id: str
+    uri: str | None = None
     title: str
     description: str | None
     filename: str
     file_path: str
     file_size: int
     file_type: str
-    content: str | None
+    abstract: str | None = None
+    overview: str | None = None
+    content: str | None = None
     status: DocumentStatus
     error_message: str | None
     category: str | None
     tags: list[str]
     folder_id: str | None
     extra_metadata: dict = Field(default_factory=dict)
-    # 技能转化相关
     skill_id: str | None = None
     is_converted: bool = False
     converted_at: str | None = None

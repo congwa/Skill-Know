@@ -4,11 +4,33 @@ import { useEffect, useState, useMemo } from "react";
 import { Plus, Search, Sparkles, FileText, Settings2, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { type SkillType } from "@/lib/api/skills";
 import { useSkillStore } from "@/lib/stores";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { PageHeader } from "@/components/admin/page-header";
+import { EmptyState } from "@/components/admin/empty-state";
+import { FilterTabs } from "@/components/admin/filter-tabs";
 
 const TYPE_LABELS: Record<SkillType, { label: string; icon: typeof Sparkles }> = {
   system: { label: "系统", icon: Settings2 },
@@ -29,16 +51,79 @@ export default function SkillsPage() {
     selectedSkill,
     filterType,
     isLoading,
+    isSaving,
     loadSkills,
     selectSkill,
     setFilterType,
+    createSkill,
+    updateSkill,
+    deleteSkill,
+    toggleSkillActive,
   } = useSkillStore();
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    content: "",
+    trigger_keywords: "",
+  });
 
   useEffect(() => {
     loadSkills();
   }, [loadSkills]);
+
+  const handleCreate = async () => {
+    const keywords = formData.trigger_keywords
+      .split(",")
+      .map((k) => k.trim())
+      .filter(Boolean);
+    const result = await createSkill({
+      name: formData.name,
+      description: formData.description,
+      content: formData.content,
+      trigger_keywords: keywords,
+    });
+    if (result) {
+      setIsCreateDialogOpen(false);
+      setFormData({ name: "", description: "", content: "", trigger_keywords: "" });
+    }
+  };
+
+  const handleEdit = async () => {
+    if (!selectedSkill) return;
+    const keywords = formData.trigger_keywords
+      .split(",")
+      .map((k) => k.trim())
+      .filter(Boolean);
+    await updateSkill(selectedSkill.id, {
+      name: formData.name,
+      description: formData.description,
+      content: formData.content,
+      trigger_keywords: keywords,
+    });
+    setIsEditDialogOpen(false);
+  };
+
+  const handleDelete = async () => {
+    if (!selectedSkill) return;
+    await deleteSkill(selectedSkill.id);
+    setIsDeleteDialogOpen(false);
+  };
+
+  const openEditDialog = () => {
+    if (!selectedSkill) return;
+    setFormData({
+      name: selectedSkill.name,
+      description: selectedSkill.description,
+      content: selectedSkill.content,
+      trigger_keywords: selectedSkill.trigger_keywords?.join(", ") ?? "",
+    });
+    setIsEditDialogOpen(true);
+  };
 
   const filteredSkills = useMemo(
     () =>
@@ -51,47 +136,49 @@ export default function SkillsPage() {
   );
 
   return (
-    <div className="h-full flex bg-background">
+    <div className="h-full flex bg-background/50">
       {/* 左侧列表 */}
-      <div className="w-72 border-r border-border flex flex-col bg-card">
+      <div className="w-80 border-r border-border flex flex-col bg-card">
         {/* 头部 */}
-        <div className="h-14 px-4 flex items-center justify-between border-b border-border">
-          <h1 className="font-semibold text-foreground">技能管理</h1>
-          <Button size="sm" variant="default" className="h-7 text-xs">
-            <Plus className="h-3.5 w-3.5 mr-1" />
-            新建
-          </Button>
-        </div>
+        <PageHeader 
+          icon={Sparkles} 
+          title="技能管理" 
+          actions={
+            <Button
+              size="sm"
+              variant="default"
+              className="h-7 text-xs"
+              onClick={() => {
+                setFormData({ name: "", description: "", content: "", trigger_keywords: "" });
+                setIsCreateDialogOpen(true);
+              }}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              新建
+            </Button>
+          } 
+        />
 
         {/* 搜索 */}
-        <div className="p-3 border-b border-border">
+        <div className="p-3 border-b border-border/50">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="搜索技能..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-8 pl-8 text-sm bg-muted/50 border-0"
+              className="h-8 pl-8 text-sm bg-background/50 border-border/50 hover:border-primary/30 focus:border-primary/50 transition-colors"
             />
           </div>
         </div>
 
         {/* 过滤标签 */}
-        <div className="px-3 py-2 flex gap-1 border-b border-border">
-          {FILTER_TABS.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setFilterType(tab.value as typeof filterType)}
-              className={cn(
-                "px-2.5 py-1 text-xs rounded-md transition-colors",
-                filterType === tab.value
-                  ? "bg-foreground text-background font-medium"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className="p-3 border-b border-border/50">
+          <FilterTabs 
+            tabs={FILTER_TABS} 
+            value={filterType} 
+            onChange={setFilterType} 
+          />
         </div>
 
         {/* 列表 */}
@@ -101,10 +188,10 @@ export default function SkillsPage() {
               加载中...
             </div>
           ) : filteredSkills.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <Sparkles className="h-6 w-6 mb-2 opacity-40" />
-              <span className="text-sm">暂无技能</span>
-            </div>
+            <EmptyState 
+              icon={Sparkles} 
+              title="暂无技能" 
+            />
           ) : (
             <div className="p-2 space-y-0.5">
               {filteredSkills.map((skill) => {
@@ -155,7 +242,7 @@ export default function SkillsPage() {
       </div>
 
       {/* 右侧详情 */}
-      <div className="flex-1 min-w-0 overflow-auto bg-background">
+      <div className="flex-1 min-w-0 overflow-auto bg-background/50">
         {selectedSkill ? (
           <div className="max-w-3xl mx-auto p-6 space-y-6">
             {/* 头部 */}
@@ -166,12 +253,17 @@ export default function SkillsPage() {
               </div>
               {selectedSkill.is_editable && (
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="h-8 text-xs">
+                  <Button variant="outline" size="sm" className="h-8 text-xs" onClick={openEditDialog}>
                     <Pencil className="h-3.5 w-3.5 mr-1" />
                     编辑
                   </Button>
                   {selectedSkill.is_deletable && (
-                    <Button variant="outline" size="sm" className="h-8 text-xs text-destructive hover:text-destructive">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => setIsDeleteDialogOpen(true)}
+                    >
                       <Trash2 className="h-3.5 w-3.5 mr-1" />
                       删除
                     </Button>
@@ -182,19 +274,19 @@ export default function SkillsPage() {
 
             {/* 属性网格 */}
             <div className="grid grid-cols-4 gap-3">
-              <div className="p-3 rounded-lg border border-border bg-card">
+              <div className="p-3 rounded-xl border border-border/50 bg-card">
                 <p className="text-xs text-muted-foreground mb-1">类型</p>
                 <p className="text-sm font-medium text-foreground">{TYPE_LABELS[selectedSkill.type]?.label}</p>
               </div>
-              <div className="p-3 rounded-lg border border-border bg-card">
+              <div className="p-3 rounded-xl border border-border/50 bg-card">
                 <p className="text-xs text-muted-foreground mb-1">分类</p>
                 <p className="text-sm font-medium text-foreground">{selectedSkill.category}</p>
               </div>
-              <div className="p-3 rounded-lg border border-border bg-card">
+              <div className="p-3 rounded-xl border border-border/50 bg-card">
                 <p className="text-xs text-muted-foreground mb-1">优先级</p>
                 <p className="text-sm font-medium text-foreground">{selectedSkill.priority}</p>
               </div>
-              <div className="p-3 rounded-lg border border-border bg-card">
+              <div className="p-3 rounded-xl border border-border/50 bg-card">
                 <p className="text-xs text-muted-foreground mb-1">状态</p>
                 <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
                   <span className={cn(
@@ -208,7 +300,7 @@ export default function SkillsPage() {
 
             {/* 关键词 */}
             {selectedSkill.trigger_keywords.length > 0 && (
-              <div className="p-4 rounded-lg border border-border bg-card">
+              <div className="p-4 rounded-xl border border-border/50 bg-card">
                 <p className="text-xs text-muted-foreground mb-2">触发关键词</p>
                 <div className="flex flex-wrap gap-1.5">
                   {selectedSkill.trigger_keywords.map((keyword, i) => (
@@ -221,7 +313,7 @@ export default function SkillsPage() {
             )}
 
             {/* 内容 */}
-            <div className="p-4 rounded-lg border border-border bg-card">
+            <div className="p-4 rounded-xl border border-border/50 bg-card">
               <p className="text-xs text-muted-foreground mb-3">技能内容</p>
               <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -231,12 +323,137 @@ export default function SkillsPage() {
             </div>
           </div>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
-            <Sparkles className="h-8 w-8 mb-3 opacity-30" />
-            <p className="text-sm">选择一个技能查看详情</p>
-          </div>
+          <EmptyState 
+            icon={Sparkles} 
+            title="未选择技能" 
+            description="请从左侧列表中选择一个技能查看详情" 
+          />
         )}
       </div>
+
+      {/* Create Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>新建技能</DialogTitle>
+            <DialogDescription>创建一个新的知识技能</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>名称</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="技能名称"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>描述</Label>
+              <Input
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="技能描述"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>内容</Label>
+              <textarea
+                value={formData.content}
+                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                placeholder="技能内容（Markdown）"
+                className="w-full h-40 p-3 rounded-md border border-border bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>触发关键词</Label>
+              <Input
+                value={formData.trigger_keywords}
+                onChange={(e) => setFormData({ ...formData, trigger_keywords: e.target.value })}
+                placeholder="逗号分隔"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleCreate} disabled={isSaving || !formData.name.trim()}>
+              {isSaving ? "创建中..." : "创建"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>编辑技能</DialogTitle>
+            <DialogDescription>修改技能信息</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>名称</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>描述</Label>
+              <Input
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>内容</Label>
+              <textarea
+                value={formData.content}
+                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                className="w-full h-40 p-3 rounded-md border border-border bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>触发关键词</Label>
+              <Input
+                value={formData.trigger_keywords}
+                onChange={(e) => setFormData({ ...formData, trigger_keywords: e.target.value })}
+                placeholder="逗号分隔"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleEdit} disabled={isSaving || !formData.name.trim()}>
+              {isSaving ? "保存中..." : "保存"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirm */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除技能「{selectedSkill?.name}」吗？此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

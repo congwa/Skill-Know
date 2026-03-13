@@ -7,7 +7,6 @@
 reasoning_content，注入到 AIMessageChunk 的 content 中作为 reasoning block。
 """
 
-from typing import Any
 
 from langchain_core.outputs import ChatGenerationChunk
 

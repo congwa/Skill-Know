@@ -10,11 +10,10 @@ from typing import Any
 from langchain_core.messages import AIMessage, AIMessageChunk
 
 from langgraph_agent_kit.streaming.content_types import (
-    is_text_block,
     is_reasoning_block,
+    is_text_block,
     is_tool_call_block,
     is_tool_call_chunk_block,
-    get_block_type,
 )
 
 __all__ = [
@@ -47,8 +46,8 @@ class ParsedContent:
     def text(self) -> str:
         """合并所有文本块的内容"""
         return "".join(
-            block.get("text", "") 
-            for block in self.text_blocks 
+            block.get("text", "")
+            for block in self.text_blocks
             if isinstance(block.get("text"), str)
         )
     
@@ -56,8 +55,8 @@ class ParsedContent:
     def reasoning(self) -> str:
         """合并所有推理块的内容"""
         return "".join(
-            block.get("reasoning", "") 
-            for block in self.reasoning_blocks 
+            block.get("reasoning", "")
+            for block in self.reasoning_blocks
             if isinstance(block.get("reasoning"), str)
         )
     

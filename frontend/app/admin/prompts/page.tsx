@@ -8,6 +8,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { listPrompts, updatePrompt, resetPrompt, type Prompt } from "@/lib/api/prompts";
 import { cn } from "@/lib/utils";
 import { RichEditor, type RichEditorRef } from "@/components/rich-editor";
+import { PageHeader } from "@/components/admin/page-header";
+import { EmptyState } from "@/components/admin/empty-state";
 
 export default function PromptsPage() {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
@@ -95,36 +97,31 @@ export default function PromptsPage() {
     <div className="h-full flex bg-background/50">
       {/* 左侧列表 */}
       <div className="w-80 border-r border-border flex flex-col bg-card min-h-0 overflow-hidden">
-        <div className="p-4 border-b border-border/50 space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-md">
-              <BookOpen className="h-4 w-4 text-white" />
-            </div>
-            <h1 className="text-lg font-semibold text-foreground">提示词管理</h1>
-          </div>
+        <PageHeader 
+          icon={BookOpen} 
+          title="提示词管理" 
+        />
+        <div className="p-3 border-b border-border/50 space-y-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="搜索提示词..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-background/50 border-border/50 hover:border-primary/30 focus:border-primary/50 transition-colors"
+              className="h-8 pl-8 text-sm bg-background/50 border-border/50 hover:border-primary/30 focus:border-primary/50 transition-colors"
             />
           </div>
         </div>
 
         <ScrollArea className="flex-1 min-h-0">
-          <div className="p-4 overflow-hidden">
+          <div className="p-3 overflow-hidden">
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-2" />
+            <div className="text-center py-12 text-muted-foreground text-sm">
+              <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
               加载中...
             </div>
           ) : filteredPrompts.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              暂无提示词
-            </div>
+            <EmptyState icon={BookOpen} title="暂无提示词" />
           ) : (
             <div className="space-y-1">
               {filteredPrompts.map((prompt) => {
@@ -134,21 +131,21 @@ export default function PromptsPage() {
                     key={prompt.key}
                     onClick={() => handleSelect(prompt)}
                     className={cn(
-                      "p-3 rounded-lg cursor-pointer transition-colors",
+                      "p-2.5 rounded-md cursor-pointer transition-colors",
                       isSelected
                         ? "list-item-selected"
                         : "list-item-hover"
                     )}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-                        <BookOpen className="h-4 w-4 text-amber-500" />
+                    <div className="flex items-start gap-2.5">
+                      <div className="h-7 w-7 rounded-md bg-amber-500/10 flex items-center justify-center shrink-0">
+                        <BookOpen className="h-3.5 w-3.5 text-amber-500" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate text-foreground">
                           {prompt.name}
                         </p>
-                        <p className="text-xs text-muted-foreground truncate">
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
                           {prompt.key}
                         </p>
                         <div className="flex items-center gap-1.5 mt-1.5">
@@ -179,7 +176,7 @@ export default function PromptsPage() {
       <div className="flex-1 min-w-0 flex flex-col bg-background/50">
         {selectedPrompt ? (
           <>
-            <div className="p-6 border-b border-border/50 bg-card/80 backdrop-blur-xl">
+            <div className="p-6 border-b border-border/50 bg-card">
               <div className="flex items-start justify-between">
                 <div>
                   <h2 className="text-xl font-bold text-foreground">{selectedPrompt.name}</h2>
@@ -194,7 +191,7 @@ export default function PromptsPage() {
                       size="sm"
                       onClick={handleReset}
                       disabled={saving}
-                      className="hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-all duration-200"
+                      className="hover:bg-accent/10 hover:border-accent/30 hover:text-accent transition-all duration-200"
                     >
                       <RotateCcw className="h-4 w-4 mr-1" />
                       恢复默认
@@ -202,9 +199,9 @@ export default function PromptsPage() {
                   )}
                   <Button
                     size="sm"
+                    variant="default"
                     onClick={handleSave}
                     disabled={saving || !hasChanges}
-                    className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md shadow-primary/20"
                   >
                     {saving ? (
                       <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -246,12 +243,7 @@ export default function PromptsPage() {
             </div>
           </>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
-            <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
-              <BookOpen className="h-8 w-8 opacity-50" />
-            </div>
-            <p>选择一个提示词进行编辑</p>
-          </div>
+          <EmptyState icon={BookOpen} title="未选择提示词" description="请从左侧列表中选择一个提示词进行编辑" />
         )}
       </div>
     </div>

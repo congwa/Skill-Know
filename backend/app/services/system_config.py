@@ -77,17 +77,22 @@ class SystemConfigService:
         """列出所有配置"""
         stmt = select(SystemConfig)
         if not include_sensitive:
-            stmt = stmt.where(SystemConfig.is_sensitive == False)
+            stmt = stmt.where(SystemConfig.is_sensitive.is_(False))
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
     async def get_llm_config(self) -> dict:
-        """获取 LLM 配置"""
+        """获取 LLM 配置
+
+        优先从数据库读取；如果数据库无配置，fallback 到环境变量 settings。
+        """
+        from app.core.config import settings
+
         return {
-            "provider": await self.get_value("llm_provider", "openai"),
-            "api_key": await self.get_value("llm_api_key", ""),
-            "base_url": await self.get_value("llm_base_url", "https://api.openai.com/v1"),
-            "chat_model": await self.get_value("llm_chat_model", "gpt-4o-mini"),
+            "provider": await self.get_value("llm_provider", settings.LLM_PROVIDER),
+            "api_key": await self.get_value("llm_api_key", settings.LLM_API_KEY),
+            "base_url": await self.get_value("llm_base_url", settings.LLM_BASE_URL),
+            "chat_model": await self.get_value("llm_chat_model", settings.LLM_CHAT_MODEL),
         }
 
     async def set_llm_config(

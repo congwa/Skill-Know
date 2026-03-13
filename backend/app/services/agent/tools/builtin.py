@@ -129,11 +129,11 @@ async def get_skill_content(
             async with get_db_context() as session:
                 from app.services.skill import SkillService
                 skill_service = SkillService(session)
-                skill = await skill_service.get(skill_id)
+                skill = await skill_service.get_skill(skill_id)
         else:
             from app.services.skill import SkillService
             skill_service = SkillService(session)
-            skill = await skill_service.get(skill_id)
+            skill = await skill_service.get_skill(skill_id)
 
         if not skill:
             return json.dumps({"error": f"技能未找到: {skill_id}"}, ensure_ascii=False)

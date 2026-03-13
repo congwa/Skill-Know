@@ -6,13 +6,14 @@
 import json
 from typing import TYPE_CHECKING, Any
 
-from langchain_core.tools import Tool, StructuredTool
+from langchain_core.tools import StructuredTool, Tool
 from pydantic import BaseModel, Field
 
 from app.core.logging import get_logger
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
+
     from app.services.skill_search.intent import IntentExtractor
     from app.services.skill_search.searcher import SkillSearcher
 

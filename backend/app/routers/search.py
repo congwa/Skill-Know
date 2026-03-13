@@ -23,10 +23,7 @@ async def unified_search(
     limit: int = Query(default=20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    """统一搜索接口
-
-    搜索技能和文档，支持渐进式披露。
-    """
+    """统一搜索接口 — 使用 SkillRetriever 语义检索"""
     results = {
         "query": q,
         "skills": [],
@@ -35,19 +32,47 @@ async def unified_search(
     }
 
     if type in [None, "all", "skill"]:
-        skill_service = SkillService(db)
-        skills = await skill_service.search_skills(q, limit=limit)
-        results["skills"] = [
-            {
-                "id": s.id,
-                "name": s.name,
-                "description": s.description,
-                "type": s.type.value,
-                "category": s.category.value,
-                "content_preview": s.content[:200] + "..." if len(s.content) > 200 else s.content,
-            }
-            for s in skills
-        ]
+        try:
+            from app.core.config import settings
+            from app.core.rerank import get_rerank_client
+            from app.core.service import get_service
+            from app.services.retriever import SkillRetriever
+
+            vector_store = get_service().get_vector_store(db)
+            rerank_client = get_rerank_client() if settings.DEFAULT_SEARCH_MODE == "thinking" else None
+            retriever = SkillRetriever(db, vector_store=vector_store, rerank_client=rerank_client)
+            response = await retriever.retrieve(query=q, limit=limit)
+
+            results["skills"] = [
+                {
+                    "id": r.skill_id,
+                    "name": r.name,
+                    "description": r.description,
+                    "type": "",
+                    "category": r.category,
+                    "content_preview": r.abstract or (r.content[:200] + "..." if r.content and len(r.content) > 200 else r.content),
+                    "abstract": r.abstract,
+                    "overview": r.overview,
+                    "score": r.score,
+                    "matched_by": r.matched_by,
+                }
+                for r in response.results
+            ]
+        except Exception as e:
+            logger.warning(f"语义检索失败，降级到文本搜索: {e}")
+            skill_service = SkillService(db)
+            skills = await skill_service.search_skills(q, limit=limit)
+            results["skills"] = [
+                {
+                    "id": s.id,
+                    "name": s.name,
+                    "description": s.description,
+                    "type": s.type.value,
+                    "category": s.category.value,
+                    "content_preview": s.content[:200] + "..." if len(s.content) > 200 else s.content,
+                }
+                for s in skills
+            ]
 
     if type in [None, "all", "document"]:
         doc_service = DocumentService(db)

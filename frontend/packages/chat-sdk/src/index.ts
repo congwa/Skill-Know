@@ -16,5 +16,3 @@ export * from "./timeline";
 // Client 模块
 export * from "./client";
 
-// 版本信息
-export const SDK_VERSION = "0.2.0";

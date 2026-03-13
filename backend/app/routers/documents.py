@@ -1,10 +1,9 @@
 """文档管理路由"""
 
-import os
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -12,15 +11,15 @@ from app.core.database import get_db
 from app.models.document import DocumentStatus
 from app.schemas.document import (
     DocumentCreate,
-    DocumentUpdate,
-    DocumentResponse,
-    DocumentListResponse,
     DocumentFolderCreate,
-    DocumentFolderUpdate,
     DocumentFolderResponse,
+    DocumentFolderUpdate,
+    DocumentListResponse,
+    DocumentResponse,
+    DocumentUpdate,
 )
 from app.services.document import DocumentService
-from app.services.document_to_skill import DocumentToSkillService, ConvertOptions
+from app.services.document_to_skill import ConvertOptions, DocumentToSkillService
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 

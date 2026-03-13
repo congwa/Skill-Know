@@ -81,6 +81,9 @@ class Message(Base, TimestampMixin):
     # 响应延迟（毫秒）
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # 归档标记（压缩后标记为归档，不再参与常规查询但保留数据）
+    is_archived: Mapped[bool] = mapped_column(default=False, index=True)
+
     # 额外元数据
     extra_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
 

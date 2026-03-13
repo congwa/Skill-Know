@@ -9,7 +9,6 @@
 
 import uuid
 from enum import Enum as PyEnum
-
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String, Text
@@ -51,6 +50,9 @@ class Skill(Base, TimestampMixin):
         default=lambda: str(uuid.uuid4()),
     )
 
+    # URI 标识 (sk://skills/{name})
+    uri: Mapped[str | None] = mapped_column(String(500), nullable=True, unique=True, index=True)
+
     # 基础信息
     name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
@@ -69,8 +71,10 @@ class Skill(Base, TimestampMixin):
         index=True,
     )
 
-    # 技能内容（Markdown 格式）
-    content: Mapped[str] = mapped_column(Text, nullable=False)
+    # 三层内容体系 (L0/L1/L2)
+    abstract: Mapped[str | None] = mapped_column(Text, nullable=True)   # L0: 简短摘要 (~100 tokens)
+    overview: Mapped[str | None] = mapped_column(Text, nullable=True)   # L1: 结构化概览 (~2k tokens)
+    content: Mapped[str] = mapped_column(Text, nullable=False)          # L2: 完整内容
 
     # 触发配置
     trigger_keywords: Mapped[list] = mapped_column(JSON, default=list)

@@ -1,7 +1,7 @@
 """内置中间件集合"""
 
-from langgraph_agent_kit.middleware.builtin.sse_events import SSEEventsMiddleware
 from langgraph_agent_kit.middleware.builtin.logging import LoggingMiddleware
+from langgraph_agent_kit.middleware.builtin.sse_events import SSEEventsMiddleware
 
 
 class Middlewares:

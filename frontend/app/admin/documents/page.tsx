@@ -23,8 +23,17 @@ import { useDocumentStore } from "@/lib/stores";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { BatchUploadDialog } from "@/components/upload";
+import { PageHeader } from "@/components/admin/page-header";
+import { EmptyState } from "@/components/admin/empty-state";
+import { FilterTabs } from "@/components/admin/filter-tabs";
 
 type SkillFilter = "all" | "converted" | "not_converted";
+
+const FILTER_TABS = [
+  { value: "all", label: "全部" },
+  { value: "converted", label: "已转化", icon: <CheckCircle2 className="h-3 w-3" /> },
+  { value: "not_converted", label: "未转化", icon: <Circle className="h-3 w-3" /> },
+] as const;
 
 export default function DocumentsPage() {
   const {
@@ -119,15 +128,12 @@ export default function DocumentsPage() {
     <div className="h-full flex bg-background/50">
       {/* 左侧列表 */}
       <div className="w-80 border-r border-border flex flex-col bg-card min-h-0 overflow-hidden">
-        <div className="p-4 border-b border-border/50 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-md">
-                <FileText className="h-4 w-4 text-white" />
-              </div>
-              <h1 className="text-lg font-semibold text-foreground">文档管理</h1>
-            </div>
-          </div>
+        <PageHeader 
+          icon={FileText} 
+          title="文档管理" 
+        />
+        
+        <div className="p-3 border-b border-border/50 space-y-3">
           <div className="flex gap-2">
             <input
               ref={fileInputRef}
@@ -141,14 +147,14 @@ export default function DocumentsPage() {
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="flex-1 hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-all duration-200"
+              className="flex-1 hover:bg-accent/10 hover:border-accent/30 hover:text-accent transition-all duration-200"
             >
               <Upload className="h-4 w-4 mr-1" />
               单文件
             </Button>
             <Button
               size="sm"
-              className="flex-1 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md shadow-primary/20"
+              className="flex-1"
               onClick={() => setBatchUploadOpen(true)}
             >
               <Plus className="h-4 w-4 mr-1" />
@@ -156,68 +162,35 @@ export default function DocumentsPage() {
             </Button>
           </div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="搜索文档..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-background/50 border-border/50 hover:border-primary/30 focus:border-primary/50 transition-colors"
+              className="h-8 pl-8 text-sm bg-background/50 border-border/50 hover:border-primary/30 focus:border-primary/50 transition-colors"
             />
           </div>
-          {/* 技能转化状态过滤 */}
-          <div className="flex gap-1">
-            <button
-              onClick={() => setSkillFilter("all")}
-              className={cn(
-                "flex-1 px-2 py-1.5 text-xs rounded-md transition-colors",
-                skillFilter === "all"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              )}
-            >
-              全部
-            </button>
-            <button
-              onClick={() => setSkillFilter("converted")}
-              className={cn(
-                "flex-1 px-2 py-1.5 text-xs rounded-md transition-colors flex items-center justify-center gap-1",
-                skillFilter === "converted"
-                  ? "bg-emerald-500 text-white"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <CheckCircle2 className="h-3 w-3" />
-              已转化
-            </button>
-            <button
-              onClick={() => setSkillFilter("not_converted")}
-              className={cn(
-                "flex-1 px-2 py-1.5 text-xs rounded-md transition-colors flex items-center justify-center gap-1",
-                skillFilter === "not_converted"
-                  ? "bg-amber-500 text-white"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Circle className="h-3 w-3" />
-              未转化
-            </button>
-          </div>
+          <FilterTabs 
+            tabs={FILTER_TABS} 
+            value={skillFilter} 
+            onChange={(val) => setSkillFilter(val as SkillFilter)} 
+          />
         </div>
 
         <ScrollArea className="flex-1 min-h-0">
-          <div className="p-4 overflow-hidden">
+          <div className="p-3 overflow-hidden">
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-12 text-muted-foreground text-sm">
               <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
               加载中...
             </div>
           ) : (
-            <div className="space-y-2 overflow-hidden">
+            <div className="space-y-1 overflow-hidden">
               {/* 返回上级 */}
               {currentFolderId && (
                 <div
                   onClick={() => setCurrentFolder(null)}
-                  className="p-3 rounded-xl border border-border/50 cursor-pointer hover:bg-muted/50 hover:border-primary/20 transition-all duration-200 flex items-center gap-3"
+                  className="p-2.5 rounded-md border border-border/50 cursor-pointer hover:bg-muted/50 hover:border-primary/20 transition-all duration-200 flex items-center gap-3"
                 >
                   <FolderOpen className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm text-foreground">返回上级</span>
@@ -229,9 +202,9 @@ export default function DocumentsPage() {
                 <div
                   key={folder.id}
                   onClick={() => setCurrentFolder(folder.id)}
-                  className="p-3 rounded-xl border border-border/50 cursor-pointer hover:bg-muted/50 hover:border-amber-500/30 transition-all duration-200 flex items-center gap-3 group"
+                  className="p-2.5 rounded-md border border-border/50 cursor-pointer hover:bg-muted/50 hover:border-amber-500/30 transition-all duration-200 flex items-center gap-3 group"
                 >
-                  <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition-colors">
+                  <div className="h-7 w-7 rounded-md bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition-colors">
                     <Folder className="h-4 w-4 text-amber-500" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -249,10 +222,7 @@ export default function DocumentsPage() {
 
               {/* 文档 */}
               {filteredDocuments.length === 0 && folders.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  暂无文档
-                </div>
+                <EmptyState icon={FileText} title="暂无文档" />
               ) : (
                 filteredDocuments.map((doc) => {
                   const FileIcon = getFileIcon(doc.file_type);
@@ -262,21 +232,21 @@ export default function DocumentsPage() {
                       key={doc.id}
                       onClick={() => selectDocument(doc)}
                       className={cn(
-                        "p-3 rounded-lg cursor-pointer transition-colors",
+                        "p-2.5 rounded-md cursor-pointer transition-colors",
                         isSelected
                           ? "list-item-selected"
                           : "list-item-hover"
                       )}
                     >
-                      <div className="flex items-start gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
-                          <FileIcon className="h-4 w-4 text-blue-500" />
+                      <div className="flex items-start gap-2.5">
+                        <div className="h-7 w-7 rounded-md bg-blue-500/10 flex items-center justify-center shrink-0">
+                          <FileIcon className="h-3.5 w-3.5 text-blue-500" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm truncate text-foreground">
                             {doc.title}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground mt-0.5">
                             {doc.file_type.toUpperCase()} · {(doc.file_size / 1024).toFixed(1)} KB
                           </p>
                           <div className="flex items-center gap-1.5 mt-1.5">
@@ -323,20 +293,20 @@ export default function DocumentsPage() {
       {/* 右侧详情 */}
       <div className="flex-1 min-w-0 overflow-auto p-6 bg-background/50">
         {selectedDocument ? (
-          <div className="max-w-3xl space-y-6">
+          <div className="max-w-3xl mx-auto space-y-6">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-foreground">{selectedDocument.title}</h2>
-                <p className="text-muted-foreground mt-1">
+                <h2 className="text-xl font-bold text-foreground">{selectedDocument.title}</h2>
+                <p className="text-sm text-muted-foreground mt-1">
                   {selectedDocument.description || "暂无描述"}
                 </p>
               </div>
               <div className="flex gap-2">
                 <Button
                   size="sm"
+                  variant="default"
                   onClick={handleConvertToSkill}
                   disabled={isConverting}
-                  className="bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 shadow-md shadow-violet-500/20"
                 >
                   {isConverting ? (
                     <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -358,7 +328,7 @@ export default function DocumentsPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Card className="bg-card/80 backdrop-blur-sm border-border/50">
+              <Card className="bg-card border-border/50 rounded-xl">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-foreground">文件信息</CardTitle>
                 </CardHeader>
@@ -368,7 +338,7 @@ export default function DocumentsPage() {
                   <div>大小: <span className="text-foreground">{(selectedDocument.file_size / 1024).toFixed(1)} KB</span></div>
                 </CardContent>
               </Card>
-              <Card className="bg-card/80 backdrop-blur-sm border-border/50">
+              <Card className="bg-card border-border/50 rounded-xl">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-foreground">时间</CardTitle>
                 </CardHeader>
@@ -384,7 +354,7 @@ export default function DocumentsPage() {
             </div>
 
             {selectedDocument.tags.length > 0 && (
-              <Card className="bg-card/80 backdrop-blur-sm border-border/50">
+              <Card className="bg-card border-border/50 rounded-xl">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-foreground">标签</CardTitle>
                 </CardHeader>
@@ -404,7 +374,7 @@ export default function DocumentsPage() {
             )}
 
             {selectedDocument.content && (
-              <Card className="bg-card/80 backdrop-blur-sm border-border/50">
+              <Card className="bg-card border-border/50 rounded-xl">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-foreground">文档内容</CardTitle>
                 </CardHeader>
@@ -417,12 +387,7 @@ export default function DocumentsPage() {
             )}
           </div>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
-            <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
-              <FileText className="h-8 w-8 opacity-50" />
-            </div>
-            <p>选择一个文档查看详情</p>
-          </div>
+          <EmptyState icon={FileText} title="未选择文档" description="请从左侧列表中选择一个文档查看详情" />
         )}
       </div>
 

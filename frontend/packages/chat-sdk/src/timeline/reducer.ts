@@ -282,7 +282,7 @@ export function timelineReducer(
         type: "error",
         id: `error:${event.seq}`,
         turnId,
-        message: payload.message || "未知错误",
+        message: payload.message || "Unknown error",
         ts: now,
       };
       return insertItem(state, item);

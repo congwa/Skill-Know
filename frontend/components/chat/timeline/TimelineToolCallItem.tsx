@@ -13,7 +13,7 @@ export function TimelineToolCallItem({ item }: TimelineToolCallItemProps) {
     running: <Loader2 className="h-4 w-4 animate-spin text-blue-500" />,
     success: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
     error: <XCircle className="h-4 w-4 text-red-500" />,
-    empty: <CheckCircle2 className="h-4 w-4 text-zinc-400" />,
+    empty: <CheckCircle2 className="h-4 w-4 text-muted-foreground" />,
   };
 
   return (
@@ -37,7 +37,7 @@ export function TimelineToolCallItem({ item }: TimelineToolCallItemProps) {
           )}
         </div>
         {item.error && (
-          <div className="mt-1 text-sm text-red-500">{item.error}</div>
+          <div className="mt-1 text-sm text-destructive">{item.error}</div>
         )}
       </div>
     </div>

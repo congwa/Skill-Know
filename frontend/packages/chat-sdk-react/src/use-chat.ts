@@ -104,24 +104,21 @@ export interface UseChatReturn {
   wsSendMessage: (action: string, payload: Record<string, unknown>) => void;
 }
 
-function getWebSocketBaseUrl(apiBaseUrl: string): string {
+function inferWebSocketBaseUrl(apiBaseUrl?: string): string {
   if (typeof window === "undefined") return "";
 
-  const envUrl = process.env.NEXT_PUBLIC_WS_URL;
-  if (envUrl) return envUrl;
-
-  if (process.env.NODE_ENV === "development") {
-    return "ws://127.0.0.1:8000";
+  if (apiBaseUrl) {
+    try {
+      const url = new URL(apiBaseUrl);
+      const protocol = url.protocol === "https:" ? "wss:" : "ws:";
+      return `${protocol}//${url.host}`;
+    } catch {
+      // fall through to window.location
+    }
   }
 
-  try {
-    const url = new URL(apiBaseUrl);
-    const protocol = url.protocol === "https:" ? "wss:" : "ws:";
-    return `${protocol}//${url.host}`;
-  } catch {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    return `${protocol}//${window.location.host}`;
-  }
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}`;
 }
 
 export function useChat(options: UseChatOptions): UseChatReturn {
@@ -168,7 +165,7 @@ export function useChat(options: UseChatOptions): UseChatReturn {
       return;
     }
 
-    const wsUrl = wsBaseUrl || getWebSocketBaseUrl(baseUrl);
+    const wsUrl = wsBaseUrl || inferWebSocketBaseUrl(baseUrl);
     const manager = createUserWebSocketManager(wsUrl, conversationId, userId);
     wsManagerRef.current = manager;
 

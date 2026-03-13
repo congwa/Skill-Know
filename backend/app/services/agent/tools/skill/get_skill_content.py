@@ -96,11 +96,18 @@ async def get_skill_content(
                 logger.info(f"│     技能描述: {skill.description[:100]}..." if len(skill.description) > 100 else f"│     技能描述: {skill.description}")
             logger.info(f"│     内容长度: {len(skill.content) if skill.content else 0} 字符")
 
+            from app.core.vector_store import VectorStore
+            vector_store = VectorStore(session)
+            if skill.uri:
+                await vector_store.update_activity(skill.uri)
+
             result_data = {
                 "skill_id": skill.id,
                 "name": skill.name,
                 "description": skill.description,
                 "category": skill.category.value if skill.category else None,
+                "abstract": skill.abstract or "",
+                "overview": skill.overview or "",
                 "content": skill.content,
             }
 

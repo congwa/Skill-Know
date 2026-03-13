@@ -13,6 +13,10 @@ export interface SearchResult {
     type: string;
     category: string;
     content_preview: string;
+    abstract?: string;
+    overview?: string;
+    score?: number;
+    matched_by?: string;
   }[];
   documents: {
     id: string;

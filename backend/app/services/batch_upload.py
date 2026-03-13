@@ -8,27 +8,27 @@ import uuid
 from pathlib import Path
 
 from fastapi import UploadFile
+from langchain_openai import ChatOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import get_db_context
 from app.core.logging import get_logger
+from app.core.queue import QueueTask, TaskType
+from app.core.service import get_service
 from app.models.document import DocumentStatus
+from app.models.skill import SkillCategory, SkillType
 from app.schemas.document import DocumentCreate
+from app.services.content_analyzer import ContentAnalyzer
 from app.services.document import DocumentService
 from app.services.document_parser import DocumentParser
-from app.services.content_analyzer import ContentAnalyzer
-from app.services.skill_generator import SkillGenerator
-from app.services.skill import SkillService
+from app.services.skill_processor import SkillProcessor
 from app.services.system_config import SystemConfigService
 from app.services.upload_task import (
-    task_manager,
-    UploadStep,
     StepStatus,
+    UploadStep,
+    task_manager,
 )
-from app.models.skill import SkillType
-from app.schemas.skill import SkillCreate
-from langchain_openai import ChatOpenAI
 
 logger = get_logger("batch_upload")
 
@@ -39,11 +39,9 @@ class BatchUploadService:
     def __init__(self, session: AsyncSession):
         self._session = session
         self._document_service = DocumentService(session)
-        self._skill_service = SkillService(session)
         self._config_service = SystemConfigService(session)
         self._parser = DocumentParser()
         self._analyzer = ContentAnalyzer()
-        self._generator = SkillGenerator()
 
     async def _get_llm(self) -> ChatOpenAI | None:
         """获取 LLM 实例"""
@@ -85,9 +83,6 @@ class BatchUploadService:
         # 获取文件 ID 映射
         file_ids = task_manager.get_file_ids(task_id)
         file_map = dict(zip(file_ids, files))
-
-        # 获取 LLM（如果需要）
-        llm = await self._get_llm() if use_llm else None
 
         # 保存文件内容到内存（因为 UploadFile 不能跨任务）
         file_contents = {}
@@ -273,42 +268,18 @@ class BatchUploadService:
             message=f"分析完成: {analysis.doc_type}",
         )
 
-        # Step 4: 生成 Skill
+        # Step 4: 通过 SkillProcessor 生成 + 去重 + 存储 + 索引
         await task_manager.update_progress(
             task_id=task_id,
             file_id=file_id,
             step=UploadStep.GENERATING,
             status=StepStatus.RUNNING,
             progress=0,
-            message="正在生成 Skill...",
+            message="正在生成 Skill (SkillProcessor)...",
         )
-
-        generated = await self._generator.generate(parsed, analysis, llm)
-
-        await task_manager.update_progress(
-            task_id=task_id,
-            file_id=file_id,
-            step=UploadStep.GENERATING,
-            status=StepStatus.COMPLETED,
-            progress=100,
-            message=f"Skill 生成完成: {generated.name}",
-        )
-
-        # Step 5: 保存
-        await task_manager.update_progress(
-            task_id=task_id,
-            file_id=file_id,
-            step=UploadStep.SAVING,
-            status=StepStatus.RUNNING,
-            progress=0,
-            message="正在保存到数据库...",
-        )
-
-        # 创建服务实例（使用传入的会话）
-        document_service = DocumentService(session)
-        skill_service = SkillService(session)
 
         # 创建文档记录
+        document_service = DocumentService(session)
         doc_data = DocumentCreate(
             title=parsed.title or filename,
             folder_id=folder_id,
@@ -322,28 +293,72 @@ class BatchUploadService:
             content=parsed.content,
         )
 
-        # 创建 Skill 记录
-        skill_data = SkillCreate(
-            name=generated.name,
-            description=generated.description,
-            content=generated.content,
-            category=generated.category,
-            trigger_keywords=generated.trigger_keywords,
-            trigger_intents=generated.trigger_intents,
-            always_apply=generated.always_apply,
-            folder_id=folder_id,
-            priority=generated.priority,
-        )
-        skill = await skill_service.create_skill(
+        service = get_service()
+        vector_store = service.get_vector_store(session)
+        processor = SkillProcessor(session=session, llm=llm, vector_store=vector_store)
+
+        skill_data = {
+            "name": parsed.title or filename,
+            "description": analysis.structure_summary[:500] if analysis.structure_summary else (parsed.content[:200] + "..."),
+            "content": parsed.content,
+            "trigger_keywords": analysis.keywords[:10] if analysis.keywords else [],
+        }
+
+        result = await processor.process(
             data=skill_data,
             skill_type=SkillType.DOCUMENT,
+            category=SkillCategory.RETRIEVAL,
             source_document_id=document.id,
+            folder_id=folder_id,
         )
 
-        # 更新文档元数据
+        if not result.success or not result.skill:
+            error_msg = result.error or "SkillProcessor 处理失败"
+            await task_manager.update_progress(
+                task_id=task_id,
+                file_id=file_id,
+                step=UploadStep.FAILED,
+                status=StepStatus.FAILED,
+                error=error_msg,
+            )
+            return
+
+        skill = result.skill
+
+        await task_manager.update_progress(
+            task_id=task_id,
+            file_id=file_id,
+            step=UploadStep.GENERATING,
+            status=StepStatus.COMPLETED,
+            progress=100,
+            message=f"Skill 生成完成: {skill.name}",
+        )
+
+        # Step 5: 异步索引入队
+        await task_manager.update_progress(
+            task_id=task_id,
+            file_id=file_id,
+            step=UploadStep.SAVING,
+            status=StepStatus.RUNNING,
+            progress=0,
+            message="正在索引...",
+        )
+
+        if result.context and service.queue_manager:
+            await service.queue_manager.enqueue(
+                QueueTask(
+                    task_type=TaskType.SKILL_INDEXING,
+                    payload={"context": result.context.to_dict()},
+                )
+            )
+
+        from datetime import datetime
         document.extra_metadata = document.extra_metadata or {}
         document.extra_metadata["skill_id"] = skill.id
         document.extra_metadata["converted"] = True
+        document.skill_id = skill.id
+        document.is_converted = True
+        document.converted_at = datetime.now().isoformat()
         document.status = DocumentStatus.COMPLETED
         await session.flush()
 

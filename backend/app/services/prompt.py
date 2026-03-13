@@ -6,10 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import get_logger
 from app.models.prompt import Prompt, PromptCategory
 from app.schemas.prompt import (
-    PromptCreate,
-    PromptUpdate,
     PromptResponse,
     PromptSource,
+    PromptUpdate,
 )
 
 logger = get_logger("prompt_service")

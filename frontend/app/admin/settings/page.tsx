@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { testConnection, type TestConnectionRequest } from "@/lib/api/quick-setup";
+import { testConnection, completeEssentialSetup, type TestConnectionRequest } from "@/lib/api/quick-setup";
+import { PageHeader } from "@/components/admin/page-header";
 
 export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [saved, setSaved] = useState(false);
 
   const [formData, setFormData] = useState<TestConnectionRequest>({
     llm_provider: "openai",
@@ -39,22 +41,55 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSave = async () => {
+    setSaving(true);
+    setSaved(false);
+    try {
+      await completeEssentialSetup(formData);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (error) {
+      setTestResult({
+        success: false,
+        message: error instanceof Error ? error.message : "保存失败",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"}/quick-setup/state`);
+        if (res.ok) {
+          const state = await res.json();
+          if (state.config) {
+            setFormData({
+              llm_provider: state.config.llm_provider || "openai",
+              llm_api_key: state.config.llm_api_key || "",
+              llm_base_url: state.config.llm_base_url || "https://api.openai.com/v1",
+              llm_chat_model: state.config.llm_chat_model || "gpt-4o-mini",
+            });
+          }
+        }
+      } catch {
+        // ignore load errors
+      }
+    };
+    loadConfig();
+  }, []);
+
   return (
-    <div className="h-full overflow-auto p-6 bg-background/50">
-      <div className="max-w-2xl mx-auto space-y-6">
-        {/* Hero 区域 */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-accent/10 border border-border/50 p-6">
-          <div className="absolute top-0 right-0 w-48 h-48 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-          <div className="relative z-10 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/25">
-              <Settings className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">系统设置</h1>
-              <p className="text-muted-foreground">管理系统配置和 LLM 连接</p>
-            </div>
-          </div>
-        </div>
+    <div className="h-full overflow-auto bg-background/50">
+      <div className="border-b border-border/50 bg-card">
+        <PageHeader 
+          icon={Settings} 
+          title="系统设置" 
+          description="管理系统配置和 LLM 连接"
+        />
+      </div>
+      <div className="max-w-2xl mx-auto p-6 space-y-6">
 
         <Card className="bg-card/80 backdrop-blur-sm border-border/50">
           <CardHeader>
@@ -112,14 +147,14 @@ export default function SettingsPage() {
             )}
 
             <div className="flex gap-2 pt-2">
-              <Button variant="outline" onClick={handleTest} disabled={testing || !formData.llm_api_key} className="hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-all duration-200">
+              <Button variant="outline" onClick={handleTest} disabled={testing || !formData.llm_api_key} className="hover:bg-accent/10 hover:border-accent/30 hover:text-accent transition-all duration-200">
                 {testing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 测试连接
               </Button>
-              <Button disabled={saving || !formData.llm_api_key} className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md shadow-primary/20">
+              <Button onClick={handleSave} disabled={saving || !formData.llm_api_key} variant="default">
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                <Save className="mr-2 h-4 w-4" />
-                保存
+                {saved ? <CheckCircle className="mr-2 h-4 w-4 text-emerald-500" /> : <Save className="mr-2 h-4 w-4" />}
+                {saved ? "已保存" : "保存"}
               </Button>
             </div>
           </CardContent>

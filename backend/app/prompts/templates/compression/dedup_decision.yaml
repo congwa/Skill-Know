@@ -1,0 +1,52 @@
+metadata:
+  id: compression.dedup_decision
+  name: Dedup Decision
+  version: "1.0"
+  category: compression
+
+variables:
+  - name: new_title
+    type: string
+    required: true
+  - name: new_abstract
+    type: string
+    required: true
+  - name: new_content
+    type: string
+    required: true
+  - name: existing_knowledge
+    type: string
+    required: true
+
+template: |
+  你是 Skill-Know 知识库的去重助手。请判断一条新知识是否与已有知识重复。
+
+  ## 新知识
+  标题: {{ new_title }}
+  摘要: {{ new_abstract }}
+  内容:
+  {{ new_content }}
+
+  ## 已有相似知识
+  {{ existing_knowledge }}
+
+  ## 决策规则
+  1. **SKIP** — 新知识与某条已有知识内容几乎完全相同（语义和信息覆盖率 > 90%），无需重复入库
+  2. **CREATE** — 新知识虽有相似之处但包含独特信息，应作为独立条目入库
+  3. **MERGE** — 新知识与某条已有知识高度相关（覆盖率 50-90%），应将新信息合并到已有条目中
+
+  ## 输出格式
+  输出 JSON，不要其他内容:
+  ```json
+  {
+    "decision": "skip" | "create" | "merge",
+    "reason": "简要说明理由",
+    "merge_target_index": null,
+    "merged_content": null
+  }
+  ```
+
+  - 如果 decision 为 "merge"，`merge_target_index` 填写应合并到的已有知识序号（1-based），`merged_content` 填写合并后的完整内容。
+  - 如果 decision 为 "skip" 或 "create"，这两个字段设为 null。
+
+  只输出 JSON。

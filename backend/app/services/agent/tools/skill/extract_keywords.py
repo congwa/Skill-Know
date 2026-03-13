@@ -62,6 +62,7 @@ async def extract_keywords(
 
     try:
         from langchain_openai import ChatOpenAI
+
         from app.core.database import get_db_context
         from app.services.skill_search.intent import IntentExtractor
         from app.services.system_config import SystemConfigService

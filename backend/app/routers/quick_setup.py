@@ -1,14 +1,14 @@
 """快速设置路由"""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.models_dev import get_providers, get_provider_models, get_provider_base_url
+from app.core.models_dev import get_provider_base_url, get_provider_models, get_providers
 from app.schemas.quick_setup import (
-    QuickSetupState,
     ChecklistResponse,
     EssentialSetupRequest,
+    QuickSetupState,
     TestConnectionRequest,
     TestConnectionResponse,
 )

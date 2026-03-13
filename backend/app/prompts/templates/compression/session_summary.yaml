@@ -1,0 +1,23 @@
+metadata:
+  id: compression.session_summary
+  name: Session Summary
+  version: "1.0"
+  category: compression
+
+variables:
+  - name: messages
+    type: string
+    required: true
+    description: 对话消息
+
+template: |
+  请对以下对话生成一个简洁的摘要（不超过 200 字）。
+  重点保留：
+  1. 用户的核心问题和意图
+  2. AI 给出的关键答案和建议
+  3. 重要的上下文信息
+
+  ## 对话内容
+  {{ messages }}
+
+  只输出摘要文本，不要其他内容。

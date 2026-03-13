@@ -18,15 +18,18 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.database import init_db
-from app.core.logging import setup_logging, get_logger
+from app.core.logging import get_logger, setup_logging
+from app.core.service import SkillKnowService, set_service
 from app.routers import (
-    documents,
-    skills,
-    prompts,
-    conversations,
     chat,
+    conversations,
+    documents,
+    health,
+    pack,
+    prompts,
     quick_setup,
     search,
+    skills,
     upload,
 )
 from app.services.skill_initializer import init_system_skills
@@ -46,8 +49,15 @@ async def lifespan(app: FastAPI):
     # 初始化系统技能
     await init_system_skills()
 
+    # 初始化核心聚合服务 (ParserRegistry + QueueManager + VectorStore)
+    service = SkillKnowService()
+    await service.initialize()
+    set_service(service)
+
     yield
 
+    # 关闭核心服务
+    await service.shutdown()
     logger.info("关闭 Skill-Know 知识库系统")
 
 
@@ -76,6 +86,8 @@ app.include_router(chat.router, prefix="/api")
 app.include_router(quick_setup.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
 app.include_router(upload.router, prefix="/api")
+app.include_router(health.router, prefix="/api")
+app.include_router(pack.router, prefix="/api")
 
 
 @app.get("/")
@@ -89,8 +101,8 @@ async def root():
 
 
 @app.get("/health")
-async def health():
-    """健康检查"""
+async def health_simple():
+    """快速健康检查（根路径级别）"""
     return {"status": "healthy"}
 
 

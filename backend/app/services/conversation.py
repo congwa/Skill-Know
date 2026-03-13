@@ -1,12 +1,12 @@
 """会话服务"""
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.logging import get_logger
 from app.models.conversation import Conversation, Message, MessageRole
-from app.schemas.conversation import ConversationCreate, MessageCreate
+from app.schemas.conversation import ConversationCreate
 
 logger = get_logger("conversation_service")
 
@@ -101,10 +101,26 @@ class ConversationService:
         return message
 
     async def get_messages(self, conversation_id: str) -> list[Message]:
-        """获取会话消息"""
+        """获取会话消息（排除已归档消息）"""
         stmt = (
             select(Message)
-            .where(Message.conversation_id == conversation_id)
+            .where(
+                Message.conversation_id == conversation_id,
+                Message.is_archived.is_(False),
+            )
+            .order_by(Message.created_at)
+        )
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_archived_messages(self, conversation_id: str) -> list[Message]:
+        """获取已归档消息"""
+        stmt = (
+            select(Message)
+            .where(
+                Message.conversation_id == conversation_id,
+                Message.is_archived.is_(True),
+            )
             .order_by(Message.created_at)
         )
         result = await self._session.execute(stmt)

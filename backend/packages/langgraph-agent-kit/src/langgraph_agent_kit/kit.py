@@ -4,19 +4,19 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncGenerator
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from langgraph_agent_kit.core.events import StreamEventType
-from langgraph_agent_kit.core.stream_event import StreamEvent
 from langgraph_agent_kit.core.context import ChatContext
 from langgraph_agent_kit.core.emitter import QueueDomainEmitter
-from langgraph_agent_kit.streaming.sse import make_event
-from langgraph_agent_kit.streaming.response_handler import StreamingResponseHandler
+from langgraph_agent_kit.core.events import StreamEventType
+from langgraph_agent_kit.core.stream_event import StreamEvent
 from langgraph_agent_kit.middleware.registry import MiddlewareRegistry
+from langgraph_agent_kit.streaming.response_handler import StreamingResponseHandler
+from langgraph_agent_kit.streaming.sse import make_event
 from langgraph_agent_kit.tools.registry import ToolRegistry
 
 if TYPE_CHECKING:
-    from langgraph_agent_kit.middleware.base import MiddlewareSpec, BaseMiddleware
+    from langgraph_agent_kit.middleware.base import BaseMiddleware, MiddlewareSpec
     from langgraph_agent_kit.tools.base import ToolSpec
 
 

@@ -1,0 +1,34 @@
+metadata:
+  id: semantic.overview_generation
+  name: Overview Generation
+  version: "1.0"
+  category: semantic
+
+variables:
+  - name: name
+    type: string
+    required: true
+  - name: description
+    type: string
+    default: ""
+  - name: content
+    type: string
+    required: true
+
+template: |
+  请根据以下技能信息生成一个结构化的概览（约 500 字以内）。
+
+  ## 技能名称
+  {{ name }}
+
+  ## 技能描述
+  {{ description }}
+
+  ## 技能内容
+  {{ content }}
+
+  ## 输出要求
+  1. 用 Markdown 格式
+  2. 包含：功能概述、核心知识点、使用场景
+  3. 简洁精炼，突出重点
+  4. 不超过 500 字

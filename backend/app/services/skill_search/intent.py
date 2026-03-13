@@ -8,8 +8,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
 
 from app.core.logging import get_logger
 

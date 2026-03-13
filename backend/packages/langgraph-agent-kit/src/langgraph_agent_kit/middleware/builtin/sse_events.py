@@ -5,8 +5,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from langgraph_agent_kit.middleware.base import BaseMiddleware, MiddlewareConfig
 from langgraph_agent_kit.core.events import StreamEventType
+from langgraph_agent_kit.middleware.base import BaseMiddleware, MiddlewareConfig
 
 
 class SSEEventsMiddleware(BaseMiddleware):

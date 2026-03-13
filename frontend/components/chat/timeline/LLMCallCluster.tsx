@@ -93,7 +93,7 @@ export function LLMCallCluster({ item, isStreaming }: LLMCallClusterProps) {
         )}
 
         {item.error && (
-          <div className="text-sm text-red-500 mt-2">错误: {item.error}</div>
+          <div className="text-sm text-destructive mt-2">错误: {item.error}</div>
         )}
       </div>
     </div>

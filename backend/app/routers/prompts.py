@@ -1,13 +1,13 @@
 """提示词管理路由"""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.schemas.prompt import (
-    PromptUpdate,
-    PromptResponse,
     PromptListResponse,
+    PromptResponse,
+    PromptUpdate,
 )
 from app.services.prompt import PromptService
 

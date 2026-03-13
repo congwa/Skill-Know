@@ -30,10 +30,10 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center">
+      <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-zinc-400" />
-          <p className="text-sm text-zinc-500">正在加载...</p>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">正在加载...</p>
         </div>
       </div>
     );

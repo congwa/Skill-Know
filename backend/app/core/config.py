@@ -3,9 +3,8 @@
 使用 pydantic-settings 管理环境变量配置。
 """
 
-import os
-from pathlib import Path
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -42,6 +41,7 @@ class Settings(BaseSettings):
         description="LLM API Base URL",
     )
     LLM_CHAT_MODEL: str = Field(default="gpt-4o-mini", description="聊天模型")
+    LLM_EMBEDDING_MODEL: str = Field(default="text-embedding-3-small", description="嵌入模型")
 
     # 服务器配置
     HOST: str = "0.0.0.0"
@@ -49,6 +49,25 @@ class Settings(BaseSettings):
 
     # CORS 配置
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+    # 知识检索配置
+    DEFAULT_SEARCH_MODE: str = Field(default="fast", description="搜索模式: fast / thinking")
+    DEFAULT_SEARCH_LIMIT: int = Field(default=5, description="默认搜索结果数")
+    AUTO_GENERATE_L0: bool = Field(default=True, description="自动生成 L0 摘要")
+    AUTO_GENERATE_L1: bool = Field(default=True, description="自动生成 L1 概览")
+
+    # 知识生命周期
+    ENABLE_KNOWLEDGE_DECAY: bool = Field(default=True, description="启用知识衰减")
+    KNOWLEDGE_DECAY_DAYS: int = Field(default=90, description="知识衰减天数阈值")
+
+    # Rerank 配置
+    RERANK_ENABLED: bool = Field(default=False, description="启用 Rerank 模型")
+    RERANK_MODEL: str = Field(default="", description="Rerank 模型名称")
+    RERANK_API_KEY: str = Field(default="", description="Rerank API Key")
+    RERANK_BASE_URL: str = Field(default="", description="Rerank API Base URL")
+
+    # 会话压缩
+    SESSION_COMPRESS_THRESHOLD: int = Field(default=20, description="会话消息压缩阈值")
 
     def ensure_data_dir(self) -> Path:
         """确保数据目录存在"""

@@ -11,21 +11,20 @@
 
 from collections.abc import Awaitable, Callable
 from enum import Enum
-from typing import Annotated, Any, Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from langchain.agents.middleware.types import (
     AgentMiddleware,
     AgentState,
     ModelRequest,
     ModelResponse,
-    ToolCallRequest,
     OmitFromInput,
+    ToolCallRequest,
 )
 from langchain_core.messages import AIMessage, ToolMessage
-from langchain_core.tools import BaseTool, tool
+from langchain_core.tools import BaseTool
 from langgraph.runtime import Runtime
-from langgraph.types import Command
-from typing_extensions import NotRequired, TypedDict
+from typing_extensions import NotRequired
 
 from app.core.logging import get_logger
 
@@ -85,8 +84,8 @@ class StatefulToolMiddleware(AgentMiddleware):
         # 注册所有工具（让 ToolNode 能够找到它们）
         from app.services.agent.tools.skill import (
             extract_keywords,
-            search_skills,
             get_skill_content,
+            search_skills,
         )
         self.tools: list[BaseTool] = [
             extract_keywords,
@@ -120,7 +119,7 @@ class StatefulToolMiddleware(AgentMiddleware):
             try:
                 from app.services.agent.tools.skill import extract_keywords
                 tools.append(extract_keywords)
-                logger.info(f"✓ 注入 extract_keywords 工具")
+                logger.info("✓ 注入 extract_keywords 工具")
             except Exception as e:
                 logger.warning(f"注入 extract_keywords 工具失败: {e}")
                 
@@ -129,7 +128,7 @@ class StatefulToolMiddleware(AgentMiddleware):
             try:
                 from app.services.agent.tools.skill import search_skills
                 tools.append(search_skills)
-                logger.info(f"✓ 注入 search_skills 工具")
+                logger.info("✓ 注入 search_skills 工具")
             except Exception as e:
                 logger.warning(f"注入 search_skills 工具失败: {e}")
                 
@@ -138,7 +137,7 @@ class StatefulToolMiddleware(AgentMiddleware):
             try:
                 from app.services.agent.tools.skill import get_skill_content
                 tools.append(get_skill_content)
-                logger.info(f"✓ 注入 get_skill_content 工具")
+                logger.info("✓ 注入 get_skill_content 工具")
             except Exception as e:
                 logger.warning(f"注入 get_skill_content 工具失败: {e}")
                 
@@ -150,6 +149,36 @@ class StatefulToolMiddleware(AgentMiddleware):
         
         self._phase_tools[phase] = tools
         return tools
+
+    def _register_skill_from_result(self, result_content: str) -> None:
+        """Parse get_skill_content result and register skill as an available context tool"""
+        try:
+            import json
+
+            from langchain_core.tools import StructuredTool
+
+            data = json.loads(result_content)
+            skill_id = data.get("skill_id")
+            skill_name = data.get("name", "unknown")
+            content = data.get("content", "")
+            if skill_id and skill_id not in self._skill_tools:
+                tool_name = f"skill_{skill_id}"
+                content_capture = content
+
+                async def _return_content(**kwargs: Any) -> str:
+                    return content_capture
+
+                tool = StructuredTool.from_function(
+                    coroutine=_return_content,
+                    name=tool_name,
+                    description=f"已加载的技能内容: {skill_name}。调用此工具可获取完整技能内容用于执行任务。",
+                )
+                self._skill_tools[skill_id] = tool
+                logger.info(f"注册 Skill 工具: {skill_name} ({skill_id})")
+                # Clear EXECUTION phase cache so new tools get picked up
+                self._phase_tools.pop(SkillPhase.EXECUTION, None)
+        except Exception as e:
+            logger.warning(f"注册 Skill 工具失败: {e}")
 
     async def awrap_model_call(
         self,
@@ -167,7 +196,7 @@ class StatefulToolMiddleware(AgentMiddleware):
         # 记录当前状态
         current_tools = [t.name for t in request.tools]
         logger.info(
-            f"📋 wrap_model_call",
+            "📋 wrap_model_call",
             phase=current_phase.value,
             base_tools=current_tools,
             phase_tools=[t.name for t in phase_tools],
@@ -179,7 +208,7 @@ class StatefulToolMiddleware(AgentMiddleware):
             updated_request = request.override(tools=updated_tools)
             
             logger.info(
-                f"➕ 动态注入工具",
+                "➕ 动态注入工具",
                 phase=current_phase.value,
                 injected=[t.name for t in phase_tools],
                 total=len(updated_tools),
@@ -208,9 +237,13 @@ class StatefulToolMiddleware(AgentMiddleware):
         
         # 执行工具
         result = await handler(request)
-        
+        result_content = result.content if hasattr(result, "content") else str(result)
+
+        # After get_skill_content succeeds, register the skill as a context tool for EXECUTION phase
+        if tool_name == "get_skill_content" and "error" not in result_content.lower():
+            self._register_skill_from_result(result_content)
+
         # 记录工具结果
-        result_content = result.content if hasattr(result, 'content') else str(result)
         logger.info(f"│  结果: {result_content[:200]}..." if len(str(result_content)) > 200 else f"│  结果: {result_content}")
         logger.info(f"└── 工具 {tool_name} 执行完成")
         
@@ -225,7 +258,7 @@ class StatefulToolMiddleware(AgentMiddleware):
             return None
             
         last_ai_msg = next(
-            (msg for msg in reversed(messages) if isinstance(msg, AIMessage)), 
+            (msg for msg in reversed(messages) if isinstance(msg, AIMessage)),
             None
         )
         if not last_ai_msg or not last_ai_msg.tool_calls:

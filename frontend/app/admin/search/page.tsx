@@ -1,15 +1,30 @@
 "use client";
 
-import { useEffect } from "react";
-import { Search, Sparkles, FileText, Database, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Search, Sparkles, FileText, Database, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSearchStore } from "@/lib/stores";
+import { PageHeader } from "@/components/admin/page-header";
 
 export default function SearchPage() {
+  const [expandedSkills, setExpandedSkills] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (skillId: string) => {
+    setExpandedSkills((prev) => {
+      const next = new Set(prev);
+      if (next.has(skillId)) {
+        next.delete(skillId);
+      } else {
+        next.add(skillId);
+      }
+      return next;
+    });
+  };
+
   const {
     query,
     sqlQuery,
@@ -29,23 +44,15 @@ export default function SearchPage() {
   }, [loadTables]);
 
   return (
-    <div className="h-full overflow-auto p-6 bg-background/50">
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Hero 区域 */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-cyan-500/10 border border-border/50 p-6">
-          <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-          <div className="relative z-10 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
-              <Search className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">知识搜索</h1>
-              <p className="text-muted-foreground">
-                搜索技能和文档，支持自然语言和 SQL 查询
-              </p>
-            </div>
-          </div>
-        </div>
+    <div className="h-full overflow-auto bg-background/50">
+      <div className="border-b border-border/50 bg-card">
+        <PageHeader 
+          icon={Search} 
+          title="知识搜索" 
+          description="搜索技能和文档，支持自然语言和 SQL 查询"
+        />
+      </div>
+      <div className="max-w-4xl mx-auto p-6 space-y-6">
 
         <Tabs defaultValue="unified" className="space-y-4">
           <TabsList className="bg-muted/50 p-1">
@@ -71,7 +78,7 @@ export default function SearchPage() {
                   className="pl-9 bg-background/50 border-border/50 hover:border-primary/30 focus:border-primary/50 transition-colors"
                 />
               </div>
-              <Button onClick={handleSearch} disabled={loading || !query.trim()} className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md shadow-primary/20">
+              <Button onClick={handleSearch} disabled={loading || !query.trim()} variant="default">
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
@@ -95,30 +102,65 @@ export default function SearchPage() {
                       技能 ({searchResult.skills.length})
                     </h3>
                     <div className="space-y-2">
-                      {searchResult.skills.map((skill) => (
-                        <Card key={skill.id} className="bg-card/80 backdrop-blur-sm border-border/50 hover:shadow-lg hover:border-primary/20 transition-all duration-200 cursor-pointer">
-                          <CardHeader className="py-3">
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <CardTitle className="text-base text-foreground">
-                                  {skill.name}
-                                </CardTitle>
-                                <CardDescription>
-                                  {skill.description}
-                                </CardDescription>
+                      {searchResult.skills.map((skill) => {
+                        const isExpanded = expandedSkills.has(skill.id);
+                        return (
+                          <Card key={skill.id} className="bg-card/80 backdrop-blur-sm border-border/50 hover:shadow-lg hover:border-primary/20 transition-all duration-200">
+                            <CardHeader className="py-3 cursor-pointer" onClick={() => toggleExpand(skill.id)}>
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-start gap-2 flex-1 min-w-0">
+                                  <button className="mt-0.5 text-muted-foreground hover:text-foreground transition-colors">
+                                    {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                  </button>
+                                  <div className="flex-1 min-w-0">
+                                    <CardTitle className="text-base text-foreground">
+                                      {skill.name}
+                                    </CardTitle>
+                                    <CardDescription className="mt-1">
+                                      {skill.abstract || skill.description}
+                                    </CardDescription>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0 ml-3">
+                                  {skill.score !== undefined && (
+                                    <span className="text-xs px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-600 font-mono">
+                                      {(skill.score * 100).toFixed(0)}%
+                                    </span>
+                                  )}
+                                  {skill.matched_by && (
+                                    <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 text-blue-600">
+                                      {skill.matched_by}
+                                    </span>
+                                  )}
+                                  <span className="text-xs px-2 py-1 rounded-full bg-violet-500/10 text-violet-600 font-medium">
+                                    {skill.type || skill.category}
+                                  </span>
+                                </div>
                               </div>
-                              <span className="text-xs px-2 py-1 rounded-full bg-violet-500/10 text-violet-600 font-medium">
-                                {skill.type}
-                              </span>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="py-2">
-                            <p className="text-sm text-muted-foreground line-clamp-2">
-                              {skill.content_preview}
-                            </p>
-                          </CardContent>
-                        </Card>
-                      ))}
+                            </CardHeader>
+                            {isExpanded && (
+                              <CardContent className="py-2 space-y-3">
+                                {skill.overview && (
+                                  <div className="p-3 rounded-lg bg-muted/30 border border-border/30">
+                                    <p className="text-xs font-medium text-muted-foreground mb-1.5">L1 概览</p>
+                                    <p className="text-sm text-foreground whitespace-pre-line">
+                                      {skill.overview}
+                                    </p>
+                                  </div>
+                                )}
+                                {skill.content_preview && (
+                                  <div className="p-3 rounded-lg bg-muted/20 border border-border/20">
+                                    <p className="text-xs font-medium text-muted-foreground mb-1.5">L2 内容预览</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      {skill.content_preview}
+                                    </p>
+                                  </div>
+                                )}
+                              </CardContent>
+                            )}
+                          </Card>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -206,7 +248,7 @@ export default function SearchPage() {
               <Button
                 onClick={handleSqlSearch}
                 disabled={loading || !sqlQuery.trim()}
-                className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md shadow-primary/20"
+                variant="default"
               >
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />

@@ -86,6 +86,9 @@ class Document(Base, TimestampMixin):
         default=lambda: str(uuid.uuid4()),
     )
 
+    # URI 标识 (sk://documents/{id})
+    uri: Mapped[str | None] = mapped_column(String(500), nullable=True, unique=True, index=True)
+
     # 基础信息
     title: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -96,9 +99,11 @@ class Document(Base, TimestampMixin):
     file_size: Mapped[int] = mapped_column(Integer, default=0)
     file_type: Mapped[str] = mapped_column(String(50), nullable=False)  # pdf, md, txt, etc.
 
-    # 内容
-    content: Mapped[str | None] = mapped_column(Text, nullable=True)  # 提取的文本内容
-    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)  # 内容哈希
+    # 三层内容体系 (L0/L1/L2)
+    abstract: Mapped[str | None] = mapped_column(Text, nullable=True)   # L0: 简短摘要
+    overview: Mapped[str | None] = mapped_column(Text, nullable=True)   # L1: 结构化概览
+    content: Mapped[str | None] = mapped_column(Text, nullable=True)    # L2: 完整内容
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # 状态
     status: Mapped[DocumentStatus] = mapped_column(

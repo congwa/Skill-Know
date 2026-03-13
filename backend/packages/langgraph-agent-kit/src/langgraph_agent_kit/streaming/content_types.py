@@ -7,17 +7,19 @@ from typing import Any, TypeGuard
 
 try:
     from langchain_core.messages.content import (
-        ContentBlock,
-        TextContentBlock,
-        ReasoningContentBlock,
-        ToolCall as ToolCallBlock,
-        ToolCallChunk,
-        InvalidToolCall,
-        ImageContentBlock,
         AudioContentBlock,
-        VideoContentBlock,
+        ContentBlock,
         FileContentBlock,
+        ImageContentBlock,
+        InvalidToolCall,
         NonStandardContentBlock,
+        ReasoningContentBlock,
+        TextContentBlock,
+        ToolCallChunk,
+        VideoContentBlock,
+    )
+    from langchain_core.messages.content import (
+        ToolCall as ToolCallBlock,
     )
 except ImportError:
     # 兼容旧版本 langchain_core

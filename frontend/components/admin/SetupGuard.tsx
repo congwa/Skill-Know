@@ -29,10 +29,10 @@ export function SetupGuard({ children }: SetupGuardProps) {
 
   if (isCheckingSetup && pathname !== "/admin/quick-setup") {
     return (
-      <div className="flex h-full items-center justify-center bg-zinc-950">
+      <div className="flex h-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
-          <p className="text-sm text-zinc-500">检查配置状态...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">检查配置状态...</p>
         </div>
       </div>
     );

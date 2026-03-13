@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Any
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from langgraph_agent_kit.tools.base import ToolSpec

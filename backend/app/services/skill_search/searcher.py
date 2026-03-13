@@ -5,14 +5,13 @@
 
 import re
 from dataclasses import dataclass, field
-from typing import Any
 
-from sqlalchemy import select, or_, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.models.skill import Skill
-from app.services.skill_search.query import SearchQuery, QueryCondition
+from app.services.skill_search.query import QueryCondition, SearchQuery
 
 logger = get_logger("skill_search.searcher")
 

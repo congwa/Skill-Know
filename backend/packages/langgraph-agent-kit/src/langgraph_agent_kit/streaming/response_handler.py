@@ -25,7 +25,7 @@ from langgraph_agent_kit.core.events import StreamEventType
 from langgraph_agent_kit.streaming.content_parser import parse_content_blocks
 
 if TYPE_CHECKING:
-    from langgraph_agent_kit.core.emitter import QueueDomainEmitter
+    pass
 
 __all__ = ["StreamingResponseHandler"]
 

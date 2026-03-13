@@ -143,11 +143,11 @@ export default function ChatPage() {
       {/* 头部 */}
       <div className="h-14 border-b border-border/50 bg-card/80 backdrop-blur-xl flex items-center justify-between px-6">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-md">
-            <Bot className="h-4 w-4 text-white" />
+          <div className="h-8 w-8 rounded-lg bg-accent/10 flex items-center justify-center">
+            <Bot className="h-4 w-4 text-accent" />
           </div>
           <div>
-            <h1 className="font-semibold text-foreground">智能对话</h1>
+            <h1 className="font-semibold text-foreground text-sm">智能对话</h1>
             <p className="text-xs text-muted-foreground">基于知识库的 AI 助手</p>
           </div>
         </div>
@@ -157,7 +157,7 @@ export default function ChatPage() {
             size="sm"
             onClick={clearMessages}
             disabled={isStreaming}
-            className="hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-all duration-200"
+            className="hover:bg-accent/10 hover:border-accent/30 hover:text-accent transition-all duration-200"
           >
             <RotateCcw className="h-4 w-4 mr-1" />
             新对话
@@ -170,8 +170,8 @@ export default function ChatPage() {
         <div className="py-6 space-y-4">
           {timeline.length === 0 ? (
             <div className="text-center py-20">
-              <div className="mx-auto mb-6 h-20 w-20 rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-accent/10 border border-border/50 flex items-center justify-center">
-                <Bot className="h-10 w-10 text-primary" />
+              <div className="mx-auto mb-6 h-20 w-20 rounded-2xl bg-muted/50 border border-border/50 flex items-center justify-center">
+                <Bot className="h-10 w-10 text-accent opacity-50" />
               </div>
               <h2 className="text-xl font-semibold text-foreground mb-2">开始对话</h2>
               <p className="text-muted-foreground text-sm max-w-md mx-auto">
@@ -232,11 +232,7 @@ export default function ChatPage() {
               onClick={handleButtonClick}
               disabled={!isStreaming && !markdown.trim()}
               size="icon"
-              className={`h-[60px] w-[60px] rounded-xl shadow-lg transition-all duration-200 ${
-                isStreaming 
-                  ? "bg-destructive hover:bg-destructive/90 shadow-destructive/25" 
-                  : "bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-primary/25 hover:shadow-xl hover:shadow-primary/30"
-              }`}
+              className="h-[60px] w-[60px] rounded-xl transition-all duration-200 shadow-sm"
               variant={isStreaming ? "destructive" : "default"}
             >
               {isStreaming ? (

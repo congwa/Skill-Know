@@ -4,20 +4,19 @@
 """
 
 from dataclasses import dataclass
-from typing import Any
 
+from langchain_openai import ChatOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.models.skill import Skill, SkillType
+from app.parse import get_registry
 from app.schemas.skill import SkillCreate
-from langchain_openai import ChatOpenAI
-
+from app.services.content_analyzer import ContentAnalysis, ContentAnalyzer
 from app.services.document import DocumentService
-from app.services.document_parser import DocumentParser, ParsedDocument
-from app.services.content_analyzer import ContentAnalyzer, ContentAnalysis
-from app.services.skill_generator import SkillGenerator, GeneratedSkill
+from app.services.document_parser import ParsedDocument
 from app.services.skill import SkillService
+from app.services.skill_generator import GeneratedSkill, SkillGenerator
 from app.services.system_config import SystemConfigService
 
 logger = get_logger("document_to_skill")
@@ -51,7 +50,7 @@ class DocumentToSkillService:
         self._document_service = DocumentService(session)
         self._skill_service = SkillService(session)
         self._config_service = SystemConfigService(session)
-        self._parser = DocumentParser()
+        self._registry = get_registry()
         self._analyzer = ContentAnalyzer()
         self._generator = SkillGenerator()
 
@@ -100,9 +99,18 @@ class DocumentToSkillService:
             )
 
         try:
-            # 2. 解析文档
-            parsed = await self._parser.parse(document.file_path)
-            logger.info(f"文档解析完成: {parsed.word_count} 字")
+            # 2. 使用 ParserRegistry 解析文档
+            parse_result = await self._registry.parse(document.file_path)
+            parsed = ParsedDocument(
+                content=parse_result.content,
+                title=parse_result.title,
+                sections=[],
+                file_type=parse_result.source_format,
+                word_count=parse_result.word_count,
+                char_count=parse_result.char_count,
+                metadata=parse_result.metadata,
+            )
+            logger.info(f"文档解析完成: {parsed.word_count} 字 (parser={parse_result.parser_name})")
 
             # 3. 分析内容
             analysis = await self._analyzer.analyze(parsed)
@@ -161,6 +169,17 @@ class DocumentToSkillService:
             document.is_converted = True
             document.converted_at = datetime.now().isoformat()
             await self._session.flush()
+
+            # 7. 异步向量索引入队
+            await self._enqueue_skill_indexing(skill)
+
+            # 8. 记录溯源关联: Skill --[derived_from]--> Document
+            await self._record_relation(
+                source_uri=skill.uri or f"sk://skills/{skill.name}",
+                target_uri=f"sk://documents/{document_id}",
+                relation_type="derived_from",
+                reason=f"Skill '{skill.name}' converted from document '{document.filename or document_id}'",
+            )
 
             logger.info(f"文档转换成功: document_id={document_id}, skill_id={skill.id}")
 
@@ -274,3 +293,55 @@ class DocumentToSkillService:
             result = await self.convert(doc_id, options)
             results.append(result)
         return results
+
+    async def _enqueue_skill_indexing(self, skill: Skill) -> None:
+        """将 Skill 入队异步向量索引"""
+        try:
+            from app.core.context import Context, ContextType
+            from app.core.queue import QueueTask, TaskType
+            from app.core.service import get_service
+
+            context = Context(
+                uri=skill.uri or f"sk://skills/{skill.name}",
+                parent_uri="sk://skills",
+                context_type=ContextType.SKILL,
+                abstract=skill.abstract or skill.description[:200],
+                overview=skill.overview or "",
+                content=skill.content,
+                meta={"name": skill.name, "skill_id": skill.id,
+                       "category": skill.category.value if skill.category else ""},
+            )
+
+            service = get_service()
+            if service.queue_manager:
+                await service.queue_manager.enqueue(
+                    QueueTask(
+                        task_type=TaskType.SKILL_INDEXING,
+                        payload={"context": context.to_dict()},
+                    )
+                )
+                logger.info("已入队异步索引", uri=context.uri)
+        except Exception as e:
+            logger.warning(f"入队索引失败（非阻塞）: {e}")
+
+    async def _record_relation(
+        self,
+        source_uri: str,
+        target_uri: str,
+        relation_type: str,
+        reason: str = "",
+    ) -> None:
+        """记录 Context 之间的关联关系"""
+        try:
+            from app.models.context_relation import ContextRelation
+            relation = ContextRelation(
+                source_uri=source_uri,
+                target_uri=target_uri,
+                relation_type=relation_type,
+                reason=reason,
+            )
+            self._session.add(relation)
+            await self._session.flush()
+            logger.info(f"关联记录: {source_uri} --[{relation_type}]--> {target_uri}")
+        except Exception as e:
+            logger.warning(f"记录关联失败（非阻塞）: {e}")

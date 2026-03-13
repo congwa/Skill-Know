@@ -11,18 +11,14 @@ import type {
   LLMCallClusterItem,
 } from "./types";
 
-/** 工具名称中文映射 */
-const TOOL_LABEL_MAP: Record<string, string> = {
-  search_products: "商品搜索",
-  get_product_details: "商品详情",
-  filter_by_price: "价格筛选",
-  compare_products: "商品对比",
-  guide_user: "用户引导",
-  load_skill: "加载技能",
-};
+let toolLabelMap: Record<string, string> = {};
+
+export function registerToolLabels(labels: Record<string, string>): void {
+  toolLabelMap = { ...toolLabelMap, ...labels };
+}
 
 export function getToolLabel(name: string): string {
-  return TOOL_LABEL_MAP[name] || name.slice(0, 10);
+  return toolLabelMap[name] || name;
 }
 
 export function createInitialState(): TimelineState {

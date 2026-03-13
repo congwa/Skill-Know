@@ -7,12 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.schemas.quick_setup import (
-    QuickSetupState,
-    SetupStep,
-    SetupStepStatus,
     ChecklistItem,
     ChecklistItemStatus,
     ChecklistResponse,
+    LlmConfigInState,
+    QuickSetupState,
+    SetupStep,
+    SetupStepStatus,
     TestConnectionResponse,
 )
 from app.services.system_config import SystemConfigService
@@ -56,8 +57,16 @@ class QuickSetupService:
     async def get_state(self) -> QuickSetupState:
         """获取设置状态"""
         is_completed = await self._config_service.is_setup_completed()
+        llm_config = await self._config_service.get_llm_config()
 
         steps = [step.model_copy() for step in SETUP_STEPS]
+
+        config = LlmConfigInState(
+            llm_provider=llm_config.get("provider", "openai"),
+            llm_api_key=llm_config.get("api_key", ""),
+            llm_base_url=llm_config.get("base_url", "https://api.openai.com/v1"),
+            llm_chat_model=llm_config.get("chat_model", "gpt-4o-mini"),
+        )
 
         if is_completed:
             for step in steps:
@@ -67,6 +76,7 @@ class QuickSetupService:
                 steps=steps,
                 essential_completed=True,
                 setup_level="essential",
+                config=config,
             )
 
         return QuickSetupState(
@@ -74,6 +84,7 @@ class QuickSetupService:
             steps=steps,
             essential_completed=False,
             setup_level="none",
+            config=config,
         )
 
     async def complete_essential_setup(

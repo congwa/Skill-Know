@@ -8,5 +8,5 @@ export * from "./payloads";
 export * from "./events";
 
 // 常量
-export const CHAT_SDK_VERSION = "0.1.0";
+export const CHAT_SDK_VERSION = "0.2.0";
 export const PROTOCOL_VERSION = 1;

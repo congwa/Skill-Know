@@ -9,7 +9,7 @@
 
 from app.services.skill_search.intent import IntentExtractor, IntentResult
 from app.services.skill_search.query import QueryBuilder, QueryCondition
-from app.services.skill_search.searcher import SkillSearcher, SkillMatch
+from app.services.skill_search.searcher import SkillMatch, SkillSearcher
 
 __all__ = [
     "IntentExtractor",

@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.schemas.conversation import (
     ConversationCreate,
-    ConversationResponse,
     ConversationListResponse,
+    ConversationResponse,
     MessageResponse,
 )
 from app.services.conversation import ConversationService
@@ -78,3 +78,26 @@ async def get_messages(
     service = ConversationService(db)
     messages = await service.get_messages(conversation_id)
     return messages
+
+
+@router.get("/{conversation_id}/stats")
+async def get_conversation_stats(
+    conversation_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取会话统计信息"""
+    service = ConversationService(db)
+    conversation = await service.get_conversation(conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    stats = (conversation.extra_metadata or {}).get("stats", {})
+    return {
+        "conversation_id": conversation_id,
+        "stats": {
+            "total_turns": stats.get("total_turns", 0),
+            "compression_count": stats.get("compression_count", 0),
+            "skills_used": stats.get("skills_used", []),
+        },
+        "has_summary": bool((conversation.extra_metadata or {}).get("summary")),
+    }

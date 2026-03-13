@@ -213,17 +213,17 @@ export function BatchUploadDialog({
                 className={cn(
                   "w-2 h-2 rounded-full transition-colors",
                   isCompleted
-                    ? "bg-green-500"
+                    ? "bg-emerald-500"
                     : isCurrent
-                    ? "bg-blue-500 animate-pulse"
-                    : "bg-gray-300"
+                    ? "bg-primary animate-pulse"
+                    : "bg-muted"
                 )}
               />
               {index < STEP_ORDER.length - 2 && (
                 <div
                   className={cn(
                     "w-4 h-0.5",
-                    isCompleted ? "bg-green-500" : "bg-gray-300"
+                    isCompleted ? "bg-emerald-500" : "bg-muted"
                   )}
                 />
               )}
@@ -256,9 +256,9 @@ export function BatchUploadDialog({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {isCompleted && <CheckCircle2 className="h-5 w-5 text-green-500" />}
-            {isFailed && <XCircle className="h-5 w-5 text-red-500" />}
-            {isProcessing && <Loader2 className="h-5 w-5 animate-spin text-blue-500" />}
+            {isCompleted && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
+            {isFailed && <XCircle className="h-5 w-5 text-destructive" />}
+            {isProcessing && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
           </div>
         </div>
 
@@ -278,12 +278,12 @@ export function BatchUploadDialog({
 
         {/* 错误信息 */}
         {state.error && (
-          <p className="text-xs text-red-500">{state.error}</p>
+          <p className="text-xs text-destructive">{state.error}</p>
         )}
 
         {/* 结果信息 */}
         {state.result && (
-          <p className="text-xs text-green-600">
+          <p className="text-xs text-emerald-600">
             已生成 Skill: {state.result.skill_name}
           </p>
         )}

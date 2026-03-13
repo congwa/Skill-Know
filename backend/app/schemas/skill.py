@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.models.skill import SkillType, SkillCategory
+from app.models.skill import SkillCategory, SkillType
 
 
 class SkillCreate(BaseModel):
@@ -42,10 +42,13 @@ class SkillResponse(BaseModel):
     """技能响应"""
 
     id: str
+    uri: str | None = None
     name: str
     description: str
     type: SkillType
     category: SkillCategory
+    abstract: str | None = None
+    overview: str | None = None
     content: str
     trigger_keywords: list[str]
     trigger_intents: list[str]

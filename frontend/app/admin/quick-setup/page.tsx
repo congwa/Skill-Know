@@ -217,7 +217,8 @@ export default function QuickSetupPage() {
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || !testResult?.success}
-            className="flex-1 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all duration-200"
+            variant="default"
+            className="flex-1 shadow-lg shadow-primary/10 transition-all duration-200"
           >
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             开始使用

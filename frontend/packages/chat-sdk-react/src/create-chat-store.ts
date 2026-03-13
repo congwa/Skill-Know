@@ -34,9 +34,11 @@ import {
   startAssistantTurn as sdkStartAssistantTurn,
   timelineReducer as sdkTimelineReducer,
   endTurn as sdkEndTurn,
+  clearTurn as sdkClearTurn,
   historyToTimeline as sdkHistoryToTimeline,
   type ChatEvent,
   type ChatRequest,
+  type ImageAttachment,
   type HistoryMessage,
   type TimelineState,
   type TimelineItemBase,
@@ -89,16 +91,19 @@ export interface CreateChatStoreOptions<T extends TimelineItemBase = TimelineIte
   onError?: (error: Error, api: ChatStoreApi<T>) => void;
   /**
    * 构建 ChatRequest 的钩子
-   * 默认行为：{ user_id, conversation_id, message }
-   * 可用于：添加 images、自定义字段等
+   * 默认行为：{ user_id, conversation_id, message, images }
+   * 可用于：添加自定义字段等
    */
   buildRequest?: (params: {
     message: string;
     conversationId: string;
     userId: string;
+    images?: ImageAttachment[];
   }) => ChatRequest;
   /** 初始 user_id（默认 "default_user"） */
   userId?: string;
+  /** 自定义聊天 API 路径（默认 "/api/v1/chat"） */
+  chatEndpoint?: string;
 }
 
 export interface ChatStoreState<T extends TimelineItemBase = TimelineItem> {
@@ -106,19 +111,25 @@ export interface ChatStoreState<T extends TimelineItemBase = TimelineItem> {
   timelineState: TimelineState<T>;
   /** 当前会话 ID */
   conversationId: string;
+  /** 当前用户 ID */
+  userId: string;
   /** 是否正在流式传输 */
   isStreaming: boolean;
   /** 错误信息 */
   error: string | null;
 
-  /** 发送消息 */
-  sendMessage: (message: string) => Promise<void>;
+  /** 发送消息（添加到 timeline + 触发 API 请求） */
+  sendMessage: (message: string, images?: ImageAttachment[]) => Promise<void>;
+  /** 仅添加用户消息到 timeline（不触发 API 请求，适用于 WebSocket 等外部通道） */
+  addUserMessageOnly: (message: string) => void;
   /** 中止当前流 */
   abortStream: () => void;
   /** 清空消息 */
   clearMessages: () => void;
   /** 设置会话 ID */
   setConversationId: (id: string) => void;
+  /** 设置用户 ID */
+  setUserId: (id: string) => void;
   /** 从历史消息初始化 */
   initFromHistory: (messages: HistoryMessage[]) => void;
   /** 直接设置 timeline 状态 */
@@ -153,6 +164,7 @@ export function createChatStoreSlice<
 
   return (set: SetFn, get: GetFn): State => {
     let client: ChatClient | null = null;
+    let currentTurnId: string | null = null;
 
     function getClient(): ChatClient {
       const baseUrl =
@@ -163,7 +175,7 @@ export function createChatStoreSlice<
         typeof options.headers === "function"
           ? options.headers()
           : options.headers;
-      client = new ChatClient({ baseUrl, headers });
+      client = new ChatClient({ baseUrl, headers, chatEndpoint: options.chatEndpoint });
       return client;
     }
 
@@ -184,24 +196,26 @@ export function createChatStoreSlice<
     return {
       timelineState: createInitialState() as TimelineState<T>,
       conversationId: "",
+      userId: options.userId || "default_user",
       isStreaming: false,
       error: null,
 
-      sendMessage: async (message: string) => {
+      sendMessage: async (message: string, images?: ImageAttachment[]) => {
         const state = get();
         if (state.isStreaming) return;
 
-        const userId = options.userId || "default_user";
+        const userId = state.userId;
         const conversationId = state.conversationId || crypto.randomUUID();
         const userMessageId = crypto.randomUUID();
         const assistantTurnId = crypto.randomUUID();
+        currentTurnId = assistantTurnId;
 
-        // 1. 添加用户消息 + 开始助手 turn
         let timelineState = state.timelineState;
         timelineState = sdkAddUserMessage(
           timelineState,
           userMessageId,
-          message
+          message,
+          images
         );
         timelineState = sdkStartAssistantTurn(timelineState, assistantTurnId);
 
@@ -212,16 +226,15 @@ export function createChatStoreSlice<
           error: null,
         } as Partial<State>);
 
-        // 2. 构建请求
         const request: ChatRequest = options.buildRequest
-          ? options.buildRequest({ message, conversationId, userId })
+          ? options.buildRequest({ message, conversationId, userId, images })
           : {
               user_id: userId,
               conversation_id: conversationId,
               message,
+              ...(images && images.length > 0 ? { images } : {}),
             };
 
-        // 3. 流式处理
         let fullContent = "";
         let finalConversationId = conversationId;
         let assistantMessageId: string = assistantTurnId;
@@ -230,18 +243,17 @@ export function createChatStoreSlice<
           const chatClient = getClient();
 
           for await (const event of chatClient.stream(request)) {
-            // 从 meta.start 提取真实 ID
             if (event.type === "meta.start") {
               const payload = event.payload as Record<string, unknown>;
               if (payload.assistant_message_id) {
                 assistantMessageId = payload.assistant_message_id as string;
+                currentTurnId = assistantMessageId;
               }
               if (event.conversation_id) {
                 finalConversationId = event.conversation_id;
               }
             }
 
-            // 累积内容
             if (event.type === "assistant.delta") {
               const payload = event.payload as { delta?: string };
               fullContent += payload.delta || "";
@@ -250,13 +262,11 @@ export function createChatStoreSlice<
               fullContent = payload.content || fullContent;
             }
 
-            // 事件中间件
             let processedEvent: ChatEvent | null = event;
             if (options.onEvent) {
               processedEvent = options.onEvent(event, api);
             }
 
-            // reducer 更新状态
             if (processedEvent) {
               set((s) => ({
                 timelineState: reducer(s.timelineState, processedEvent!),
@@ -265,13 +275,12 @@ export function createChatStoreSlice<
             }
           }
 
-          // 4. 结束 turn
+          currentTurnId = null;
           set((s) => ({
             timelineState: sdkEndTurn(s.timelineState) as TimelineState<T>,
             isStreaming: false,
           }));
 
-          // 5. 流结束回调
           if (options.onStreamEnd) {
             await options.onStreamEnd(
               {
@@ -283,19 +292,33 @@ export function createChatStoreSlice<
             );
           }
         } catch (error) {
+          const turnToClean = currentTurnId;
+          currentTurnId = null;
           if (error instanceof Error && error.name === "AbortError") {
-            set((s) => ({
-              timelineState: sdkEndTurn(s.timelineState) as TimelineState<T>,
-              isStreaming: false,
-            }));
+            if (turnToClean) {
+              set((s) => ({
+                timelineState: sdkClearTurn(s.timelineState, turnToClean) as TimelineState<T>,
+                isStreaming: false,
+              }));
+            } else {
+              set({ isStreaming: false } as Partial<State>);
+            }
             return;
           }
           const errorMessage =
             error instanceof Error ? error.message : String(error);
-          set({
-            error: errorMessage,
-            isStreaming: false,
-          } as Partial<State>);
+          if (turnToClean) {
+            set((s) => ({
+              timelineState: sdkClearTurn(s.timelineState, turnToClean) as TimelineState<T>,
+              isStreaming: false,
+              error: errorMessage,
+            }));
+          } else {
+            set({
+              error: errorMessage,
+              isStreaming: false,
+            } as Partial<State>);
+          }
           if (options.onError && error instanceof Error) {
             options.onError(error, api);
           }
@@ -306,10 +329,16 @@ export function createChatStoreSlice<
         if (client) {
           client.abort();
         }
-        set((s) => ({
-          timelineState: sdkEndTurn(s.timelineState) as TimelineState<T>,
-          isStreaming: false,
-        }));
+        const turnToClean = currentTurnId;
+        currentTurnId = null;
+        if (turnToClean) {
+          set((s) => ({
+            timelineState: sdkClearTurn(s.timelineState, turnToClean) as TimelineState<T>,
+            isStreaming: false,
+          }));
+        } else {
+          set({ isStreaming: false } as Partial<State>);
+        }
       },
 
       clearMessages: () => {
@@ -323,6 +352,10 @@ export function createChatStoreSlice<
         set({ conversationId: id } as Partial<State>);
       },
 
+      setUserId: (id: string) => {
+        set({ userId: id } as Partial<State>);
+      },
+
       initFromHistory: (messages: HistoryMessage[]) => {
         set({
           timelineState: sdkHistoryToTimeline(messages) as unknown as TimelineState<T>,
@@ -332,6 +365,69 @@ export function createChatStoreSlice<
       setTimelineState: (timelineState: TimelineState<T>) => {
         set({ timelineState } as Partial<State>);
       },
+
+      addUserMessageOnly: (message: string) => {
+        const userMessageId = crypto.randomUUID();
+        set((s) => ({
+          timelineState: sdkAddUserMessage(
+            s.timelineState,
+            userMessageId,
+            message
+          ) as TimelineState<T>,
+        }));
+      },
     };
+  };
+}
+
+// ==================== Extended Store Helper ====================
+
+/**
+ * 创建带扩展字段的聊天 Store
+ *
+ * 解决消费方在 `create<ExtendedState>()` 时需要 `as any` 类型断言的问题。
+ *
+ * @example
+ * ```typescript
+ * import { create } from "zustand";
+ * import { createExtendedChatStore } from "@embedease/chat-sdk-react";
+ *
+ * interface MyState extends ChatStoreState {
+ *   customField: string;
+ *   setCustomField: (v: string) => void;
+ * }
+ *
+ * export const useChatStore = create<MyState>(
+ *   createExtendedChatStore(
+ *     { baseUrl: "/api" },
+ *     (sdkSlice, set) => ({
+ *       customField: "",
+ *       setCustomField: (v) => set({ customField: v }),
+ *     })
+ *   )
+ * );
+ * ```
+ */
+export function createExtendedChatStore<
+  T extends TimelineItemBase = TimelineItem,
+  Extra extends Record<string, unknown> = Record<string, never>,
+>(
+  options: CreateChatStoreOptions<T>,
+  extend: (
+    sdkSlice: ChatStoreState<T>,
+    set: (partial: Partial<ChatStoreState<T> & Extra> | ((state: ChatStoreState<T> & Extra) => Partial<ChatStoreState<T> & Extra>)) => void,
+    get: () => ChatStoreState<T> & Extra
+  ) => Extra
+) {
+  const sliceCreator = createChatStoreSlice<T>(options);
+
+  return (
+    set: (partial: Partial<ChatStoreState<T> & Extra> | ((state: ChatStoreState<T> & Extra) => Partial<ChatStoreState<T> & Extra>)) => void,
+    get: () => ChatStoreState<T> & Extra
+  ): ChatStoreState<T> & Extra => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sdkSlice = sliceCreator(set as any, get as any);
+    const extra = extend(sdkSlice, set, get);
+    return { ...sdkSlice, ...extra } as ChatStoreState<T> & Extra;
   };
 }

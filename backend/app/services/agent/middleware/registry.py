@@ -23,8 +23,9 @@ def build_middlewares(model: Any, session: Any = None, emitter: Any = None) -> l
         按顺序排列的中间件列表
     """
     from langchain.agents.middleware.tool_call_limit import ToolCallLimitMiddleware
-    from app.services.agent.middleware.logging import LoggingMiddleware
+
     from app.services.agent.middleware.dynamic_tools import StatefulToolMiddleware
+    from app.services.agent.middleware.logging import LoggingMiddleware
     
     middlewares: list[Any] = []
     

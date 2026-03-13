@@ -11,25 +11,25 @@ import uuid
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from langchain_core.messages import HumanMessage, AIMessage
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from langgraph_agent_kit import (
-    StreamEvent,
     Orchestrator,
     OrchestratorHooks,
     StreamEndInfo,
+    StreamEvent,
 )
 from langgraph_agent_kit.core.context import ChatContext
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.chat_models import V1ChatModel
 from app.core.logging import get_logger
+from app.core.service import get_service
 from app.schemas.events import StreamEventType
-from app.services.conversation import ConversationService
-from app.services.skill import SkillService
-from app.services.prompt import PromptService
-from app.services.system_config import SystemConfigService
 from app.services.agent.core import agent_service
+from app.services.conversation import ConversationService
+from app.services.prompt import PromptService
+from app.services.retriever import SkillRetriever
+from app.services.skill import SkillService
+from app.services.system_config import SystemConfigService
 
 logger = get_logger("chat_service")
 
@@ -85,42 +85,78 @@ class ChatService:
             streaming=True,
         )
 
-    async def _build_messages(
-        self,
-        conversation_id: str,
-        user_message: str,
-        skill_context: str = "",
-    ) -> list:
-        """构建消息列表
-        
-        Args:
-            conversation_id: 会话 ID
-            user_message: 用户消息
-            skill_context: 匹配的 Skill 内容（渐进式加载）
+    async def _pre_retrieve(self, message: str, limit: int = 3) -> str:
+        """预检索：对用户消息做快速语义检索，返回格式化的知识上下文。
+
+        参考 OpenViking 的 RAG 注入模式：在 Agent 运行之前就将相关知识注入 system prompt，
+        减少 Agent 对工具调用的依赖，降低延迟。
         """
-        messages = []
+        try:
+            from app.core.config import settings
+            from app.core.rerank import get_rerank_client
 
-        # 系统提示词
-        system_prompt = await self._prompt_service.get_content("system.chat")
-        if system_prompt:
-            messages.append(SystemMessage(content=system_prompt))
+            vector_store = get_service().get_vector_store(self._session)
+            rerank_client = (
+                get_rerank_client()
+                if settings.DEFAULT_SEARCH_MODE == "thinking"
+                else None
+            )
+            retriever = SkillRetriever(
+                self._session,
+                vector_store=vector_store,
+                rerank_client=rerank_client,
+            )
+            response = await retriever.retrieve(query=message, limit=limit, threshold=0.2)
 
-        # 注入匹配的 Skill 内容（渐进式加载的核心）
-        if skill_context:
-            messages.append(SystemMessage(content=skill_context))
+            if not response.results:
+                return ""
 
-        # 历史消息
-        history = await self._conversation_service.get_messages(conversation_id)
-        for msg in history:
-            if msg.role.value == "user":
-                messages.append(HumanMessage(content=msg.content))
-            elif msg.role.value == "assistant":
-                messages.append(AIMessage(content=msg.content))
+            parts = ["## 以下是与用户问题可能相关的知识库内容（自动检索）：\n"]
+            for i, r in enumerate(response.results):
+                content = r.overview or r.abstract or r.content[:500]
+                parts.append(
+                    f"### [{i+1}] {r.name}\n"
+                    f"- 相关度: {r.score:.2f}\n"
+                    f"- 摘要: {r.abstract}\n"
+                    f"- 内容:\n{content}\n"
+                )
 
-        # 当前用户消息
-        messages.append(HumanMessage(content=user_message))
+            parts.append(
+                "\n> 提示：如需更详细的信息，可以使用 get_skill_content 工具获取完整内容。"
+            )
+            context_str = "\n".join(parts)
+            logger.info("预检索命中", count=len(response.results), query=message[:50])
+            return context_str
 
-        return messages
+        except Exception as e:
+            logger.warning(f"预检索失败（非阻塞）: {e}")
+            return ""
+
+    async def _async_compress(self, conversation_id: str) -> None:
+        """异步执行会话压缩"""
+        try:
+            from app.core.database import get_db_context
+            from app.services.session_compressor import SessionCompressor
+            from app.services.system_config import SystemConfigService
+
+            async with get_db_context() as session:
+                config_service = SystemConfigService(session)
+                llm_config = await config_service.get_llm_config()
+                llm = None
+                if llm_config.get("api_key"):
+                    from langchain_openai import ChatOpenAI
+
+                    llm = ChatOpenAI(
+                        api_key=llm_config["api_key"],
+                        base_url=llm_config["base_url"],
+                        model=llm_config["chat_model"],
+                        temperature=0.3,
+                    )
+                compressor = SessionCompressor(session=session, llm=llm)
+                await compressor.compress(conversation_id)
+                await session.commit()
+        except Exception as e:
+            logger.warning(f"异步会话压缩失败: {e}")
 
     async def chat_stream(
         self,
@@ -171,6 +207,17 @@ class ChatService:
         llm = await self._get_llm()
         system_prompt = await self._prompt_service.get_content("system.chat") or ""
 
+        # 预检索：在 Agent 运行前检索相关知识并注入 system prompt
+        pre_retrieved_context = await self._pre_retrieve(message)
+        if pre_retrieved_context:
+            system_prompt = f"{system_prompt}\n\n{pre_retrieved_context}"
+
+        # 注入会话压缩摘要（如果有）
+        if conversation and conversation.extra_metadata:
+            summary = conversation.extra_metadata.get("summary", "")
+            if summary:
+                system_prompt = f"{system_prompt}\n\n## 之前的对话摘要（已压缩）\n{summary}"
+
         # 构建 AgentRunner
         runner = SkillKnowAgentRunner(
             model=llm,
@@ -180,6 +227,7 @@ class ChatService:
 
         # 落库 & 日志钩子
         conversation_service = self._conversation_service
+        user_msg = message
 
         async def on_stream_end(info: StreamEndInfo) -> None:
             agg = info.aggregator
@@ -196,6 +244,44 @@ class ChatService:
                 message_id=info.assistant_message_id,
                 content_length=len(agg.full_content),
             )
+
+            # 更新会话统计
+            try:
+                conv = await conversation_service.get_conversation(info.conversation_id)
+                if conv:
+                    stats = conv.extra_metadata.get("stats", {}) if conv.extra_metadata else {}
+                    stats["total_turns"] = stats.get("total_turns", 0) + 1
+                    conv.extra_metadata = {**(conv.extra_metadata or {}), "stats": stats}
+                    await self._session.flush()
+            except Exception:
+                pass
+
+            # 异步提取对话知识（不阻塞响应）
+            import asyncio
+
+            from app.services.knowledge_extractor import extract_and_store_knowledge
+
+            asyncio.create_task(
+                extract_and_store_knowledge(
+                    conversation_id=info.conversation_id,
+                    messages=[
+                        {"role": "user", "content": user_msg},
+                        {"role": "assistant", "content": agg.full_content},
+                    ],
+                )
+            )
+
+            # 检查是否需要会话压缩
+            try:
+                from app.services.session_compressor import SessionCompressor
+
+                compressor = SessionCompressor(session=self._session)
+                if await compressor.should_compress(info.conversation_id):
+                    asyncio.create_task(
+                        self._async_compress(info.conversation_id)
+                    )
+            except Exception:
+                pass
 
         async def on_error(e: Exception, conv_id: str) -> None:
             logger.exception("Agent 聊天失败 (SDK v0.2)", conversation_id=conv_id, error=str(e))

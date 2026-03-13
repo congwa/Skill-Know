@@ -12,6 +12,7 @@ export { useWebSocket, type UseWebSocketOptions, type UseWebSocketReturn } from 
 // Zustand Store Factory
 export {
   createChatStoreSlice,
+  createExtendedChatStore,
   type CreateChatStoreOptions,
   type ChatStoreState,
   type ChatStoreApi,

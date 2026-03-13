@@ -56,6 +56,15 @@ class SetupStep(BaseModel):
     is_required: bool = True
 
 
+class LlmConfigInState(BaseModel):
+    """状态中的 LLM 配置（供设置页加载）"""
+
+    llm_provider: str = "openai"
+    llm_api_key: str = ""
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_chat_model: str = "gpt-4o-mini"
+
+
 class QuickSetupState(BaseModel):
     """快速设置状态"""
 
@@ -64,6 +73,7 @@ class QuickSetupState(BaseModel):
     essential_completed: bool = False
     setup_level: str = "none"  # none, essential, full
     data: dict = Field(default_factory=dict)
+    config: LlmConfigInState | None = None
 
 
 class EssentialSetupRequest(BaseModel):

@@ -1,10 +1,11 @@
 """技能服务"""
 
-from sqlalchemy import select, func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.context import build_skill_uri
 from app.core.logging import get_logger
-from app.models.skill import Skill, SkillType, SkillCategory
+from app.models.skill import Skill, SkillCategory, SkillType
 from app.schemas.skill import SkillCreate, SkillUpdate
 
 logger = get_logger("skill_service")
@@ -23,9 +24,14 @@ class SkillService:
         source_document_id: str | None = None,
     ) -> Skill:
         """创建技能"""
+        uri = build_skill_uri(data.name)
+        abstract = data.description[:200] if data.description else ""
+
         skill = Skill(
             name=data.name,
             description=data.description,
+            uri=uri,
+            abstract=abstract,
             type=skill_type,
             category=data.category,
             content=data.content,
@@ -75,15 +81,53 @@ class SkillService:
         return skill
 
     async def delete_skill(self, skill_id: str) -> bool:
-        """删除技能"""
+        """删除技能及其关联的向量索引和关联记录"""
         skill = await self.get_skill(skill_id)
         if not skill or not skill.is_deletable:
             return False
 
+        uri = skill.uri
+        if uri:
+            await self._cleanup_vector_index(uri)
+            await self._cleanup_relations(uri)
+
         await self._session.delete(skill)
         await self._session.flush()
-        logger.info("删除技能", skill_id=skill_id)
+        logger.info("删除技能", skill_id=skill_id, uri=uri)
         return True
+
+    async def _cleanup_vector_index(self, uri: str) -> None:
+        """清理技能关联的向量索引"""
+        try:
+            from sqlalchemy import delete as sql_delete
+
+            from app.models.vector_index import VectorIndex
+
+            stmt = sql_delete(VectorIndex).where(VectorIndex.uri == uri)
+            result = await self._session.execute(stmt)
+            if result.rowcount:
+                logger.info("清理向量索引", uri=uri, deleted=result.rowcount)
+        except Exception as e:
+            logger.warning(f"清理向量索引失败（非阻塞）: {e}")
+
+    async def _cleanup_relations(self, uri: str) -> None:
+        """清理技能关联的上下文关系"""
+        try:
+            from sqlalchemy import delete as sql_delete
+
+            from app.models.context_relation import ContextRelation
+
+            stmt = sql_delete(ContextRelation).where(
+                or_(
+                    ContextRelation.source_uri == uri,
+                    ContextRelation.target_uri == uri,
+                )
+            )
+            result = await self._session.execute(stmt)
+            if result.rowcount:
+                logger.info("清理上下文关联", uri=uri, deleted=result.rowcount)
+        except Exception as e:
+            logger.warning(f"清理上下文关联失败（非阻塞）: {e}")
 
     async def get_skill(self, skill_id: str) -> Skill | None:
         """获取技能"""

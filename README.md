@@ -967,6 +967,22 @@ Skill-Know/
 - `GET /api/health` - 健康检查
 - `POST /api/pack` - 打包导出技能
 
+## 致谢
+
+本项目核心架构设计灵感来源于 [OpenViking](https://github.com/volcengine/OpenViking) 开源项目。
+
+OpenViking 是一个专为 AI Agent 设计的开源上下文数据库，其创新性的设计理念深深影响了 Skill-Know 的架构：
+
+- **文件系统管理范式**：将上下文统一管理为虚拟文件系统，通过 URI 精确定位
+- **分层上下文加载 (L0/L1/L2)**：自动将内容处理为三层结构，大幅降低 Token 消耗
+- **目录递归检索**：层级式检索提升召回效果
+
+特别感谢 OpenViking 团队的杰出工作和开源贡献，让 AI Agent 的上下文管理变得更加优雅和高效。
+
+> **OpenViking** — The Context Database for AI Agents
+> 
+> GitHub: https://github.com/volcengine/OpenViking
+
 ## 许可证
 
 MIT
